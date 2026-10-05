@@ -11,18 +11,35 @@ import org.springframework.stereotype.Service;
 public class AdminSecurityService {
 
     public Role verifyRole(String roleHeader) {
-        if (roleHeader == null || roleHeader.trim().isEmpty()) {
-            throw new UnauthorizedException("Authentication required: Administrative credentials must be supplied via 'X-Admin-Role'");
+        String effectiveRole = roleHeader;
+
+        if (effectiveRole == null || effectiveRole.trim().isEmpty()) {
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && auth.getAuthorities() != null
+                    && !(auth instanceof org.springframework.security.authentication.AnonymousAuthenticationToken)
+                    && !"anonymousUser".equals(auth.getPrincipal())) {
+                for (var authority : auth.getAuthorities()) {
+                    String authName = authority.getAuthority();
+                    if (authName.startsWith("ROLE_")) {
+                        effectiveRole = authName.substring(5);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (effectiveRole == null || effectiveRole.trim().isEmpty()) {
+            throw new UnauthorizedException("Authentication required: Administrative credentials must be supplied via 'X-Admin-Role' or JWT Bearer token");
         }
 
         try {
-            Role role = Role.valueOf(roleHeader.trim().toUpperCase());
+            Role role = Role.valueOf(effectiveRole.trim().toUpperCase());
             if (role == Role.CUSTOMER) {
                 throw new ForbiddenException("Access denied: Customers are strictly forbidden from accessing admin catalogue endpoints");
             }
             return role;
         } catch (IllegalArgumentException e) {
-            throw new ForbiddenException("Access denied: Unrecognized administrative role '" + roleHeader + "'");
+            throw new ForbiddenException("Access denied: Unrecognized administrative role '" + effectiveRole + "'");
         }
     }
 

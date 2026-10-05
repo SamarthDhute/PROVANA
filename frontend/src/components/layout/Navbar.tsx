@@ -5,6 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useStore } from "@/context/StoreContext";
+import { useAuth } from "@/context/AuthContext";
+import { ROLE_PRESETS } from "@/types/auth";
 import { PROVANA_PRODUCTS } from "@/data/products";
 
 const NAV_CATEGORIES = [
@@ -23,12 +25,15 @@ export default function Navbar() {
   const currentCategory = pathname === "/products" ? (searchParams.get("category") || "All") : null;
 
   const { cartCount, wishlist, toggleCart, openModal } = useStore();
+  const { user, isAuthenticated, openAuthModal, logout, quickLogin } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState<typeof PROVANA_PRODUCTS>([]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -42,6 +47,9 @@ export default function Navbar() {
     const handleClickOutside = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setIsSearchOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setIsUserMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -96,6 +104,75 @@ export default function Navbar() {
         transition: "all 0.25s ease",
       }}
     >
+      {/* Active Role Strip (visible when authenticated) */}
+      {isAuthenticated && user && (
+        <div
+          style={{
+            backgroundColor:
+              user.role === "ADMIN"
+                ? "rgba(239, 68, 68, 0.16)"
+                : user.role === "PRODUCT_MANAGER"
+                ? "rgba(245, 158, 11, 0.16)"
+                : user.role === "MANAGER"
+                ? "rgba(59, 130, 246, 0.16)"
+                : "rgba(16, 185, 129, 0.14)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+            padding: "5px 20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            fontSize: "11.5px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>
+              {user.role === "ADMIN"
+                ? "👑"
+                : user.role === "PRODUCT_MANAGER"
+                ? "📦"
+                : user.role === "MANAGER"
+                ? "🏪"
+                : "🛒"}
+            </span>
+            <span style={{ color: "#FFF", fontWeight: "700" }}>
+              Active RBAC Role: <strong style={{ color: "var(--color-accent)" }}>{user.role}</strong> ({user.firstName} {user.lastName})
+            </span>
+            <span style={{ color: "#94A3B8" }}>— Spring Security JWT Authenticated</span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <button
+              onClick={() => openAuthModal()}
+              style={{
+                backgroundColor: "rgba(255, 255, 255, 0.12)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                color: "#FFF",
+                padding: "2px 8px",
+                borderRadius: "4px",
+                fontSize: "11px",
+                fontWeight: "700",
+                cursor: "pointer",
+              }}
+            >
+              Switch Role ⇄
+            </button>
+            <button
+              onClick={logout}
+              style={{
+                backgroundColor: "transparent",
+                border: "none",
+                color: "#EF4444",
+                fontSize: "11px",
+                fontWeight: "700",
+                cursor: "pointer",
+              }}
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="site-container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: "76px" }}>
         {/* Brand Logo */}
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -369,6 +446,220 @@ export default function Navbar() {
               </span>
             )}
           </button>
+
+          {/* Role & Auth Portal Trigger */}
+          <div ref={userMenuRef} style={{ position: "relative" }}>
+            {!isAuthenticated ? (
+              <button
+                onClick={() => openAuthModal("ADMIN")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  height: "38px",
+                  padding: "0 14px",
+                  borderRadius: "9999px",
+                  backgroundColor: "rgba(245, 158, 11, 0.12)",
+                  border: "1.5px solid rgba(245, 158, 11, 0.45)",
+                  color: "#FBBF24",
+                  fontSize: "12.5px",
+                  fontWeight: "800",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(245, 158, 11, 0.22)";
+                  e.currentTarget.style.borderColor = "#FBBF24";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(245, 158, 11, 0.12)";
+                  e.currentTarget.style.borderColor = "rgba(245, 158, 11, 0.45)";
+                }}
+              >
+                <span style={{ fontSize: "14px" }}>🛡️</span>
+                <span>ROLES / LOGIN</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "7px",
+                  height: "38px",
+                  padding: "0 12px",
+                  borderRadius: "9999px",
+                  backgroundColor: "rgba(255, 255, 255, 0.08)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  color: "#FFF",
+                  fontSize: "12px",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                }}
+              >
+                <span>
+                  {user?.role === "ADMIN"
+                    ? "👑"
+                    : user?.role === "PRODUCT_MANAGER"
+                    ? "📦"
+                    : user?.role === "MANAGER"
+                    ? "🏪"
+                    : "🛒"}
+                </span>
+                <span
+                  style={{
+                    maxWidth: "85px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {user?.firstName}
+                </span>
+                <span
+                  style={{
+                    fontSize: "9px",
+                    fontWeight: "800",
+                    backgroundColor:
+                      user?.role === "ADMIN"
+                        ? "#EF4444"
+                        : user?.role === "PRODUCT_MANAGER"
+                        ? "#F59E0B"
+                        : user?.role === "MANAGER"
+                        ? "#3B82F6"
+                        : "#10B981",
+                    color: "#FFF",
+                    padding: "2px 5px",
+                    borderRadius: "4px",
+                  }}
+                >
+                  {user?.role === "PRODUCT_MANAGER" ? "PM" : user?.role}
+                </span>
+                <span style={{ fontSize: "10px", color: "#94A3B8" }}>▼</span>
+              </button>
+            )}
+
+            {/* Dropdown Menu */}
+            {isUserMenuOpen && isAuthenticated && user && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "46px",
+                  right: 0,
+                  width: "280px",
+                  backgroundColor: "#141720",
+                  border: "1.5px solid rgba(255, 255, 255, 0.12)",
+                  borderRadius: "12px",
+                  padding: "16px",
+                  boxShadow: "0 16px 36px rgba(0, 0, 0, 0.9)",
+                  zIndex: 1001,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: "800", color: "#FFF" }}>
+                    {user.firstName} {user.lastName}
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#94A3B8", fontFamily: "monospace" }}>
+                    {user.email}
+                  </div>
+                  <div style={{ marginTop: "6px" }}>
+                    <span
+                      style={{
+                        fontSize: "10px",
+                        fontWeight: "800",
+                        color: "#10B981",
+                        backgroundColor: "rgba(16, 185, 129, 0.15)",
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                      }}
+                    >
+                      ROLE: {user.role}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: "10px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", marginBottom: "8px" }}>
+                    QUICK SWITCH ROLE:
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                    {ROLE_PRESETS.map((p) => (
+                      <button
+                        key={p.role}
+                        onClick={() => {
+                          quickLogin(p.role);
+                          setIsUserMenuOpen(false);
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          padding: "6px 8px",
+                          borderRadius: "6px",
+                          backgroundColor: user.role === p.role ? "rgba(245, 158, 11, 0.2)" : "#1E2430",
+                          border: `1px solid ${user.role === p.role ? "var(--color-accent)" : "rgba(255, 255, 255, 0.08)"}`,
+                          color: "#FFF",
+                          fontSize: "10.5px",
+                          fontWeight: "700",
+                          cursor: "pointer",
+                          textAlign: "left",
+                        }}
+                      >
+                        <span>{p.icon}</span>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {p.title}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: "10px", display: "flex", gap: "8px" }}>
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      openAuthModal();
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "8px",
+                      borderRadius: "6px",
+                      backgroundColor: "rgba(255, 255, 255, 0.08)",
+                      color: "#CBD5E1",
+                      border: "none",
+                      fontSize: "12px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                    }}
+                  >
+                    All Roles 🛡️
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      logout();
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "8px",
+                      borderRadius: "6px",
+                      backgroundColor: "rgba(239, 68, 68, 0.15)",
+                      color: "#EF4444",
+                      border: "1px solid rgba(239, 68, 68, 0.3)",
+                      fontSize: "12px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Cart Trigger Button */}
           <button

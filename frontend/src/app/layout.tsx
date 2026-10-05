@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { Bebas_Neue, Manrope, Oswald } from "next/font/google";
 import "./globals.css";
 import { StoreProvider } from "@/context/StoreContext";
+import { AuthProvider } from "@/context/AuthContext";
 import AnnouncementBar from "@/components/layout/AnnouncementBar";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import CartDrawer from "@/components/cart/CartDrawer";
 import GlobalModals from "@/components/common/GlobalModals";
+import AuthModal from "@/components/auth/AuthModal";
 import Toast from "@/components/common/Toast";
 import AiAdvisorWidget from "@/components/ai/AiAdvisorWidget";
 
@@ -50,16 +52,19 @@ export default function RootLayout({
     <html lang="en" className={`${bebasNeue.variable} ${manrope.variable} ${oswald.variable}`}>
       <body style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
         <StoreProvider>
-          <AnnouncementBar />
-          <Suspense fallback={<header style={{ height: "72px", backgroundColor: "rgba(11, 12, 14, 0.95)" }} />}>
-            <Navbar />
-          </Suspense>
-          <main style={{ flex: 1 }}>{children}</main>
-          <Footer />
-          <CartDrawer />
-          <GlobalModals />
-          <Toast />
-          <AiAdvisorWidget />
+          <AuthProvider>
+            <AnnouncementBar />
+            <Suspense fallback={<header style={{ height: "72px", backgroundColor: "rgba(11, 12, 14, 0.95)" }} />}>
+              <Navbar />
+            </Suspense>
+            <main style={{ flex: 1 }}>{children}</main>
+            <Footer />
+            <CartDrawer />
+            <GlobalModals />
+            <AuthModal />
+            <Toast />
+            <AiAdvisorWidget />
+          </AuthProvider>
         </StoreProvider>
       </body>
     </html>
