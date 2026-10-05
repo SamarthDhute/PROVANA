@@ -1,0 +1,19 @@
+# Production Profile Configuration
+spring:
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    clean-disabled: true
+
+server:
+  error:
+    include-stacktrace: never
+    include-message: never
+
+logging:
+  level:
+    root: WARN
+    com.provana: INFO
+    org.springframework.web: WARN

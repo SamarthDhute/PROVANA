@@ -1,0 +1,61 @@
+# ========================================================
+# PROVANA Full-Stack Monorepo Git Ignore
+# ========================================================
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.bak
+*.zip
+
+# IDE & Editor Files
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
+
+# Node & Next.js (Frontend)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+
+# Java & Maven (Backend)
+backend/target/
+backend/*.jar
+backend/*.war
+backend/.flattened-pom.xml
+backend/.env
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# AI IDE Scratch & Diagnostics
+.system_generated/
+scratch/
+.gemini/
+.agent/
+.agents/
+.gsd/
+
+# Local Documentation & Prototypes (Excluded from git push)
+docs/
+docx/
+prototype/
+*.zip

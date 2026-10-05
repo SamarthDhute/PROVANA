@@ -1,0 +1,110 @@
+/**
+ * PROVANA Design Tokens
+ * Source: Charcoal + Black + White + Ice Blue Design System
+ * Target: Next.js 14/15 Production Frontend
+ */
+
+:root {
+  /* ==========================================================================
+     1. COLOR SYSTEM (Charcoal + Black + White + Ice Blue DTC)
+     ========================================================================== */
+  
+  /* Canvas & Surfaces */
+  --color-bg-primary: #090A0C;
+  --color-bg-secondary: #111318;
+  --color-bg-tertiary: #181B20;
+  --color-bg: #090A0C;
+  --color-bg-deep: #070809;
+  --color-surface: #111318;
+  --color-surface-hover: #17191D;
+  --color-surface-subtle: #0E1014;
+  --color-surface-dark: #090A0C;
+  --color-surface-elevated: #1C1F24;
+  
+  /* Borders & Dividers */
+  --color-border: #292D33;
+  --color-border-light: rgba(255, 255, 255, 0.05);
+  --color-border-hover: rgba(143, 184, 216, 0.4);
+  --color-border-accent: rgba(143, 184, 216, 0.35);
+  --color-border-focus: #8FB8D8;
+
+  /* Brand Accents (Ice Blue Performance System) */
+  --color-accent: #8FB8D8;
+  --color-accent-hover: #A9CCE5;
+  --color-accent-dark: #6F98B8;
+  --color-accent-dim: rgba(143, 184, 216, 0.15);
+  --color-accent-glow: rgba(143, 184, 216, 0.28);
+  
+  /* Button Colors */
+  --color-btn-primary-bg: #8FB8D8;
+  --color-btn-primary-text: #090A0C;
+  --color-btn-primary-hover: #A9CCE5;
+
+  --color-btn-cart-bg: #FFFFFF;
+  --color-btn-cart-text: #090A0C;
+  --color-btn-cart-hover: #F3F4F6;
+
+  --color-btn-buy-bg: #8FB8D8;
+  --color-btn-buy-text: #090A0C;
+  --color-btn-buy-border: #8FB8D8;
+  --color-btn-buy-hover: #A9CCE5;
+
+  /* Typography Colors */
+  --color-text-primary: #F5F5F5;
+  --color-text-secondary: #A7ABB2;
+  --color-text-muted: #737983;
+  --color-text-main: #F5F5F5;
+  --color-text-sub: #A7ABB2;
+  --color-text-dim: #737983;
+  --color-text-inverse: #090A0C;
+
+  /* Semantics */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-info: #3B82F6;
+
+  /* ==========================================================================
+     2. TYPOGRAPHY SYSTEM
+     ========================================================================== */
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-stats: 'Oswald', sans-serif;
+
+  /* ==========================================================================
+     3. SPACING SYSTEM (8px unit)
+     ========================================================================== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* ==========================================================================
+     4. RADII & SHADOWS
+     ========================================================================== */
+  --radius-sm: 4px;
+  --radius-btn: 6px;
+  --radius-card: 12px;
+  --radius-modal: 16px;
+  --radius-pill: 9999px;
+
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --shadow-accent: 0 8px 24px rgba(143, 184, 216, 0.2);
+
+  /* ==========================================================================
+     5. TRANSITIONS & TIMING
+     ========================================================================== */
+  --motion-fast: 150ms cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-normal: 250ms cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-slow: 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
