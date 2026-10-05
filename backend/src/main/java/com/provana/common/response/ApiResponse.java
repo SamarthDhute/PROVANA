@@ -40,6 +40,22 @@ public record ApiResponse<T>(
         return success(data, "Request successful", path);
     }
 
+    public static <T> ApiResponse<T> ok(T data) {
+        return new ApiResponse<>(true, "Operation successful", data, null, Instant.now(), null);
+    }
+
+    public static <T> ApiResponse<T> ok(T data, String message) {
+        return new ApiResponse<>(true, message, data, null, Instant.now(), null);
+    }
+
+    public static <T> ApiResponse<T> created(T data) {
+        return new ApiResponse<>(true, "Resource created successfully", data, null, Instant.now(), null);
+    }
+
+    public static <T> ApiResponse<T> created(T data, String message) {
+        return new ApiResponse<>(true, message, data, null, Instant.now(), null);
+    }
+
     public static <T> ApiResponse<T> error(String message, List<ValidationError> errors, String path) {
         return new ApiResponse<>(false, message, null, errors, Instant.now(), path);
     }
