@@ -141,6 +141,27 @@ export default function Navbar() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {(user.role === "ADMIN" || user.role === "PRODUCT_MANAGER" || user.role === "MANAGER") && (
+              <Link
+                href="/admin"
+                style={{
+                  backgroundColor: "var(--color-accent)",
+                  color: "#0B0C0E",
+                  padding: "4px 10px",
+                  borderRadius: "4px",
+                  fontSize: "11px",
+                  fontWeight: "800",
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)",
+                }}
+              >
+                <span>👑</span>
+                <span>OPEN ADMIN PORTAL →</span>
+              </Link>
+            )}
             <button
               onClick={() => openAuthModal()}
               style={{
@@ -617,7 +638,29 @@ export default function Navbar() {
                   </div>
                 </div>
 
-                <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: "10px", display: "flex", gap: "8px" }}>
+                <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.08)", paddingTop: "10px" }}>
+                  {(user.role === "ADMIN" || user.role === "PRODUCT_MANAGER" || user.role === "MANAGER") && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "6px",
+                        backgroundColor: "rgba(245, 158, 11, 0.15)",
+                        border: "1px solid rgba(245, 158, 11, 0.35)",
+                        color: "#FBBF24",
+                        fontSize: "12px",
+                        fontWeight: "800",
+                        textAlign: "center",
+                        textDecoration: "none",
+                        display: "block",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      👑 Open Catalogue Admin Portal →
+                    </Link>
+                  )}
+                  <div style={{ display: "flex", gap: "8px" }}>
                   <button
                     onClick={() => {
                       setIsUserMenuOpen(false);
@@ -658,8 +701,9 @@ export default function Navbar() {
                   </button>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
 
           {/* Cart Trigger Button */}
           <button

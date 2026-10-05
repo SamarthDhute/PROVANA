@@ -21,7 +21,7 @@ public enum Role {
     )),
     MANAGER(Set.of(
             Permission.CATALOGUE_READ,
-            Permission.CATALOGUE_WRITE
+            Permission.ORDER_MANAGE
     )),
     CONTENT_MANAGER(Set.of(
             Permission.CATALOGUE_READ,

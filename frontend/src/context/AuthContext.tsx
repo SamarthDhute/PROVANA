@@ -2,8 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { User, UserRole, AuthResponse, ROLE_PRESETS } from "@/types/auth";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8081";
+import { authApi } from "@/lib/api/authApi";
 
 interface AuthContextType {
   user: User | null;
@@ -47,22 +46,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(JSON.parse(storedUser));
 
         // Background check token validity with backend /api/v1/auth/me
-        fetch(`${API_BASE_URL}/api/v1/auth/me`, {
-          headers: {
-            Authorization: `Bearer ${storedToken}`,
-          },
-        })
-          .then((res) => {
-            if (res.ok) {
-              return res.json();
-            } else {
-              throw new Error("Token expired");
-            }
-          })
-          .then((data) => {
-            if (data?.data) {
-              setUser(data.data);
-              localStorage.setItem("provana_user", JSON.stringify(data.data));
+        authApi
+          .getMe()
+          .then((currentUser) => {
+            if (currentUser) {
+              setUser(currentUser);
+              localStorage.setItem("provana_user", JSON.stringify(currentUser));
             }
           })
           .catch(() => {
@@ -88,22 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        return {
-          success: false,
-          message: data?.message || "Invalid email or password",
-        };
-      }
-
-      const authData: AuthResponse = data.data;
+      const authData = await authApi.login({ email: email.trim(), password });
       setToken(authData.token);
       setUser(authData.user);
 
@@ -117,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err: any) {
       return {
         success: false,
-        message: err.message || "Failed to connect to authentication server",
+        message: err.message || "Invalid email or password",
       };
     } finally {
       setIsLoading(false);
@@ -134,29 +108,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }): Promise<{ success: boolean; message: string }> => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: payload.email.trim(),
-          password: payload.password,
-          firstName: payload.firstName.trim(),
-          lastName: payload.lastName.trim(),
-          phone: payload.phone?.trim() || "",
-          role: payload.role || "CUSTOMER",
-        }),
+      const authData = await authApi.register({
+        email: payload.email.trim(),
+        password: payload.password,
+        firstName: payload.firstName.trim(),
+        lastName: payload.lastName.trim(),
+        phone: payload.phone?.trim() || "",
+        role: payload.role || "CUSTOMER",
       });
 
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        return {
-          success: false,
-          message: data?.message || "Registration failed",
-        };
-      }
-
-      const authData: AuthResponse = data.data;
       setToken(authData.token);
       setUser(authData.user);
 
@@ -191,14 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     try {
-      if (token) {
-        fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }).catch(() => {});
-      }
+      authApi.logout().catch(() => {});
     } finally {
       setUser(null);
       setToken(null);

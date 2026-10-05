@@ -1,28 +1,73 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, notFound } from "next/navigation";
 import { PROVANA_PRODUCTS } from "@/data/products";
 import { useStore } from "@/context/StoreContext";
+import { productApi, mapBackendProductDetailToProduct } from "@/lib/api/productApi";
+import { Product } from "@/types";
 
 export default function ProductDetailPage() {
   const params = useParams();
   const slug = params?.slug as string;
-  const product = PROVANA_PRODUCTS.find((p) => p.slug === slug || p.id === slug);
+  const fallbackProduct = PROVANA_PRODUCTS.find((p) => p.slug === slug || p.id === slug);
 
-  if (!product) {
+  const [liveProduct, setLiveProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!slug) return;
+    productApi
+      .getProductBySlug(slug)
+      .then((detail) => {
+        if (detail) {
+          setLiveProduct(mapBackendProductDetailToProduct(detail));
+        }
+      })
+      .catch((err) => {
+        console.warn("Backend product detail API error, using offline fallback:", err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [slug]);
+
+  const product = liveProduct || fallbackProduct;
+
+  const { addToCart, buyNow, toggleWishlist, isInWishlist, openModal } = useStore();
+  const wishlisted = product ? isInWishlist(product.id) : false;
+
+  const [selectedFlavor, setSelectedFlavor] = useState(product?.flavors?.[0] || "Standard");
+  const [selectedSize, setSelectedSize] = useState(product?.sizes?.[0] || "Standard");
+  const [qty, setQty] = useState(1);
+  const [openAccordion, setOpenAccordion] = useState<string | null>("nutrition");
+
+  useEffect(() => {
+    if (product) {
+      if (product.flavors && product.flavors.length > 0) {
+        setSelectedFlavor(product.flavors[0]);
+      }
+      if (product.sizes && product.sizes.length > 0) {
+        setSelectedSize(product.sizes[0]);
+      }
+    }
+  }, [product]);
+
+  if (!loading && !product) {
     notFound();
   }
 
-  const { addToCart, buyNow, toggleWishlist, isInWishlist, openModal } = useStore();
-  const wishlisted = isInWishlist(product.id);
-
-  const [selectedFlavor, setSelectedFlavor] = useState(product.flavors[0]);
-  const [selectedSize, setSelectedSize] = useState(product.sizes[0]);
-  const [qty, setQty] = useState(1);
-  const [openAccordion, setOpenAccordion] = useState<string | null>("nutrition");
+  if (!product) {
+    return (
+      <div style={{ padding: "100px 0", textAlign: "center", minHeight: "60vh" }}>
+        <div style={{ color: "var(--color-accent)", fontSize: "18px", fontWeight: "700" }}>
+          Loading Product Details...
+        </div>
+      </div>
+    );
+  }
 
   const toggleAccordion = (name: string) => {
     setOpenAccordion((prev) => (prev === name ? null : name));

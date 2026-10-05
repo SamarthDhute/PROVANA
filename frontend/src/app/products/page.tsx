@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { PROVANA_PRODUCTS } from "@/data/products";
 import ProductCard from "@/components/catalog/ProductCard";
+import { productApi, mapBackendProductSummaryToProduct } from "@/lib/api/productApi";
+import { Product } from "@/types";
 
 const CATEGORIES = [
   "All",
@@ -35,6 +37,21 @@ function CatalogContent() {
   const [selectedGoal, setSelectedGoal] = useState(initialGoal);
   const [selectedSort, setSelectedSort] = useState("featured");
   const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [liveProducts, setLiveProducts] = useState<Product[] | null>(null);
+
+  // Load live catalogue from Spring Boot backend
+  useEffect(() => {
+    productApi
+      .listProducts({ size: 100 })
+      .then((res) => {
+        if (res?.content && res.content.length > 0) {
+          setLiveProducts(res.content.map(mapBackendProductSummaryToProduct));
+        }
+      })
+      .catch((err) => {
+        console.warn("Backend product API unavailable, using offline fallback:", err);
+      });
+  }, []);
 
   // Sync state whenever URL searchParams change (e.g. from Header navigation)
   useEffect(() => {
@@ -51,9 +68,11 @@ function CatalogContent() {
     });
   }, [searchParams]);
 
+  const sourceProducts = liveProducts || PROVANA_PRODUCTS;
+
   // Multi-Filter & Sort Pipeline
   const filteredProducts = useMemo(() => {
-    return PROVANA_PRODUCTS.filter((prod) => {
+    return sourceProducts.filter((prod) => {
       // Category filter
       if (selectedCategory !== "All") {
         if (selectedCategory === "Performance") {
