@@ -55,7 +55,6 @@ scratch/
 .gsd/
 
 # Local Documentation & Prototypes (Excluded from git push)
-docs/
 docx/
 prototype/
 *.zip

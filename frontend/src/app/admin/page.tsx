@@ -10,7 +10,7 @@ import { categoryApi, Category, Subcategory, Brand } from "@/lib/api/categoryApi
 import { ProductSummary } from "@/lib/api/productApi";
 
 export default function AdminCataloguePage() {
-  const { user, token, isAuthenticated, openAuthModal, quickLogin } = useAuth();
+  const { user, token, isAuthenticated, openAuthModal, quickLogin, can } = useAuth();
   const { showToast } = useStore();
 
   // Top-level Navigation Tab
@@ -85,7 +85,13 @@ export default function AdminCataloguePage() {
     status: "PUBLISHED" as "DRAFT" | "PUBLISHED" | "UNPUBLISHED",
   });
 
-  const isStaff = isAuthenticated && (user?.role === "ADMIN" || user?.role === "PRODUCT_MANAGER" || user?.role === "MANAGER");
+  const isStaff = isAuthenticated && (
+    can("CATALOGUE_READ") ||
+    can("USER_READ") ||
+    can("INVENTORY_READ") ||
+    can("ORDER_READ") ||
+    can("CMS_READ")
+  );
 
   // Fetch Products & Metadata
   const fetchData = useCallback(async () => {
@@ -559,7 +565,7 @@ export default function AdminCataloguePage() {
             >
               <span>🛍️ Storefront View</span>
             </Link>
-            {activeMainTab === "PRODUCTS" && (
+            {activeMainTab === "PRODUCTS" && can("PRODUCT_CREATE") && (
               <button
                 onClick={() => {
                   setFormData({
@@ -598,7 +604,7 @@ export default function AdminCataloguePage() {
                 <span>+ CREATE PRODUCT</span>
               </button>
             )}
-            {activeMainTab === "CATEGORIES" && (
+            {activeMainTab === "CATEGORIES" && can("CATEGORY_CREATE") && (
               <button
                 onClick={() => handleOpenCategoryModal()}
                 style={{
@@ -617,7 +623,7 @@ export default function AdminCataloguePage() {
                 <span>+ NEW CATEGORY</span>
               </button>
             )}
-            {activeMainTab === "SUBCATEGORIES" && (
+            {activeMainTab === "SUBCATEGORIES" && can("SUBCATEGORY_CREATE") && (
               <button
                 onClick={() => handleOpenSubcategoryModal()}
                 style={{
@@ -636,7 +642,7 @@ export default function AdminCataloguePage() {
                 <span>+ NEW SUBCATEGORY</span>
               </button>
             )}
-            {activeMainTab === "BRANDS" && (
+            {activeMainTab === "BRANDS" && can("BRAND_CREATE") && (
               <button
                 onClick={() => handleOpenBrandModal()}
                 style={{

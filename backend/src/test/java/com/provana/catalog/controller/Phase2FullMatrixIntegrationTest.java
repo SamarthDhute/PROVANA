@@ -46,6 +46,84 @@ class Phase2FullMatrixIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private com.provana.catalog.repository.CategoryRepository categoryRepository;
+
+    @Autowired
+    private com.provana.catalog.repository.SubcategoryRepository subcategoryRepository;
+
+    @Autowired
+    private com.provana.catalog.repository.BrandRepository brandRepository;
+
+    @Autowired
+    private com.provana.catalog.repository.ProductRepository productRepository;
+
+    @Autowired
+    private com.provana.catalog.repository.ProductVariantRepository productVariantRepository;
+
+    @Autowired
+    private com.provana.catalog.repository.SkuRepository skuRepository;
+
+    @Autowired
+    private com.provana.catalog.repository.ProductMediaRepository productMediaRepository;
+
+    @Autowired
+    private com.provana.catalog.repository.ProductFaqRepository productFaqRepository;
+
+    @Autowired
+    private com.provana.catalog.repository.ProductNutritionRepository productNutritionRepository;
+
+    private static boolean cleaned = false;
+
+    private void deleteProductAndChildren(UUID productId) {
+        if (productId == null) return;
+        var variants = productVariantRepository.findByProductIdOrderBySortOrderAsc(productId);
+        for (var v : variants) {
+            skuRepository.findByVariantId(v.getId()).forEach(skuRepository::delete);
+            productVariantRepository.delete(v);
+        }
+        productMediaRepository.findByProductIdOrderBySortOrderAsc(productId).forEach(productMediaRepository::delete);
+        productFaqRepository.findByProductIdOrderBySortOrderAsc(productId).forEach(productFaqRepository::delete);
+        productNutritionRepository.findByProductId(productId).ifPresent(productNutritionRepository::delete);
+        productRepository.findById(productId).ifPresent(productRepository::delete);
+    }
+
+    @org.junit.jupiter.api.BeforeEach
+    void cleanBeforeFirstRun() {
+        if (!cleaned) {
+            try {
+                productRepository.findBySlug("matrix-test-product").ifPresent(p -> deleteProductAndChildren(p.getId()));
+                productRepository.findBySlug("matrix-test-product-custom").ifPresent(p -> deleteProductAndChildren(p.getId()));
+
+                categoryRepository.findBySlug("matrix-test-category").ifPresent(c -> {
+                    productRepository.findAll().stream()
+                            .filter(p -> p.getCategory() != null && c.getId().equals(p.getCategory().getId()))
+                            .forEach(p -> deleteProductAndChildren(p.getId()));
+                    subcategoryRepository.findAll().stream()
+                            .filter(s -> s.getCategory() != null && c.getId().equals(s.getCategory().getId()))
+                            .forEach(subcategoryRepository::delete);
+                    categoryRepository.delete(c);
+                });
+
+                brandRepository.findBySlug("matrix-brand").ifPresent(b -> {
+                    productRepository.findAll().stream()
+                            .filter(p -> p.getBrand() != null && b.getId().equals(p.getBrand().getId()))
+                            .forEach(p -> deleteProductAndChildren(p.getId()));
+                    brandRepository.delete(b);
+                });
+                brandRepository.findBySlug("matrix-test-brand").ifPresent(b -> {
+                    productRepository.findAll().stream()
+                            .filter(p -> p.getBrand() != null && b.getId().equals(p.getBrand().getId()))
+                            .forEach(p -> deleteProductAndChildren(p.getId()));
+                    brandRepository.delete(b);
+                });
+            } catch (Exception e) {
+                // Ignore and proceed
+            }
+            cleaned = true;
+        }
+    }
+
     // Static test context IDs preserved across ordered test steps
     private static UUID testCategoryId;
     private static UUID testSubcategoryId;

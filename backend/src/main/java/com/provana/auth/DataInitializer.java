@@ -26,6 +26,8 @@ public class DataInitializer implements CommandLineRunner {
         seedUser("admin@provana.com", "Admin@123", "Admin", "Provana", Role.ADMIN);
         seedUser("pm@provana.com", "Pm@123", "Product", "Manager", Role.PRODUCT_MANAGER);
         seedUser("manager@provana.com", "Manager@123", "Store", "Manager", Role.MANAGER);
+        seedUser("content@provana.com", "Content@123", "Content", "Specialist", Role.CONTENT_MANAGER);
+        seedUser("order@provana.com", "Order@123", "Order", "Specialist", Role.ORDER_MANAGER);
         seedUser("customer@provana.com", "Customer@123", "Aarav", "Sharma", Role.CUSTOMER);
     }
 

@@ -48,7 +48,7 @@ public class SecurityConfig {
                         // Public customer catalogue read endpoints
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**", "/api/v1/subcategories/**", "/api/v1/brands/**", "/api/v1/products/**").permitAll()
                         // Protected admin endpoints require authenticated administrative role
-                        .requestMatchers("/api/v1/admin/**").hasAnyRole("ADMIN", "PRODUCT_MANAGER", "MANAGER")
+                        .requestMatchers("/api/v1/admin/**").hasAnyRole("ADMIN", "PRODUCT_MANAGER", "MANAGER", "CONTENT_MANAGER", "ORDER_MANAGER")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { User, UserRole, AuthResponse, ROLE_PRESETS } from "@/types/auth";
 import { authApi } from "@/lib/api/authApi";
+import { Permission, can as checkCan, hasAnyPermission } from "@/lib/permissions";
 
 interface AuthContextType {
   user: User | null;
@@ -11,6 +12,8 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthModalOpen: boolean;
   selectedRoleForModal: UserRole;
+  can: (permission: Permission) => boolean;
+  canAny: (permissions: Permission[]) => boolean;
   openAuthModal: (role?: UserRole) => void;
   closeAuthModal: () => void;
   login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
@@ -166,6 +169,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const can = useCallback(
+    (permission: Permission) => {
+      return checkCan(user?.role, permission);
+    },
+    [user?.role]
+  );
+
+  const canAny = useCallback(
+    (permissions: Permission[]) => {
+      return hasAnyPermission(user?.role, permissions);
+    },
+    [user?.role]
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -175,6 +192,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isAuthModalOpen,
         selectedRoleForModal,
+        can,
+        canAny,
         openAuthModal,
         closeAuthModal,
         login,

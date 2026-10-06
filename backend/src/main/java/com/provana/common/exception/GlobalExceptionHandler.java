@@ -133,6 +133,28 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle Spring Security AccessDeniedException (@PreAuthorize / method security violations).
+     */
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(org.springframework.security.access.AccessDeniedException ex, HttpServletRequest request) {
+        log.warn("Access denied at [{}]: {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error("Access denied: Insufficient privileges for requested operation", request.getRequestURI()));
+    }
+
+    /**
+     * Handle Spring Security AuthenticationException.
+     */
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAuthenticationException(org.springframework.security.core.AuthenticationException ex, HttpServletRequest request) {
+        log.warn("Authentication failed at [{}]: {}", request.getRequestURI(), ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("Authentication required: Please provide valid credentials via Bearer token", request.getRequestURI()));
+    }
+
+    /**
      * Handle database constraint violations (duplicate keys, foreign key violations, check constraints).
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
