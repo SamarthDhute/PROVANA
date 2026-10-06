@@ -26,6 +26,7 @@ export default function Navbar() {
 
   const { cartCount, wishlist, toggleCart, openModal } = useStore();
   const { user, isAuthenticated, openAuthModal, logout, quickLogin } = useAuth();
+  const [mounted, setMounted] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState<typeof PROVANA_PRODUCTS>([]);
@@ -34,6 +35,10 @@ export default function Navbar() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -105,7 +110,7 @@ export default function Navbar() {
       }}
     >
       {/* Active Role Strip (visible when authenticated) */}
-      {isAuthenticated && user && (
+      {mounted && isAuthenticated && user && (
         <div
           style={{
             backgroundColor:
@@ -445,7 +450,7 @@ export default function Navbar() {
             }}
           >
             ♡
-            {wishlist.length > 0 && (
+            {mounted && wishlist.length > 0 && (
               <span
                 style={{
                   position: "absolute",
@@ -470,7 +475,7 @@ export default function Navbar() {
 
           {/* Role & Auth Portal Trigger */}
           <div ref={userMenuRef} style={{ position: "relative" }}>
-            {!isAuthenticated ? (
+            {!mounted || !isAuthenticated ? (
               <button
                 onClick={() => openAuthModal("ADMIN")}
                 style={{
@@ -561,7 +566,7 @@ export default function Navbar() {
             )}
 
             {/* Dropdown Menu */}
-            {isUserMenuOpen && isAuthenticated && user && (
+            {mounted && isUserMenuOpen && isAuthenticated && user && (
               <div
                 style={{
                   position: "absolute",
@@ -736,7 +741,7 @@ export default function Navbar() {
                 borderRadius: "9999px",
               }}
             >
-              {cartCount}
+              {mounted ? cartCount : 0}
             </span>
           </button>
 
