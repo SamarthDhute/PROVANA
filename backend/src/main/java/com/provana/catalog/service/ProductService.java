@@ -341,8 +341,8 @@ public class ProductService {
                 startingPrice,
                 compareAtPrice,
                 primaryImageUrl,
-                4.9, // Default verified rating score
-                128, // Default verified review count
+                0.0, // Default rating score until review module
+                0,   // Default review count until review module
                 product.getCreatedAt()
         );
     }

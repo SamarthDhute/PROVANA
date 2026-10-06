@@ -414,13 +414,19 @@ export default function BestSellerCarousel() {
                   </h3>
                 </Link>
 
-                {/* 2. RATING */}
+                {/* 2. RATING OR VERIFIED SEAL */}
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", marginBottom: "14px" }}>
-                  <div style={{ color: "#FBBF24", display: "flex", gap: "2px" }}>
-                    <span>★</span>
-                  </div>
-                  <span style={{ fontWeight: "700", color: "#FFFFFF" }}>{prod.rating}</span>
-                  <span style={{ color: "#64748B", fontSize: "12px" }}>({prod.reviewCount} reviews)</span>
+                  {prod.rating && prod.rating > 0 ? (
+                    <>
+                      <div style={{ color: "#FBBF24", display: "flex", gap: "2px" }}>
+                        <span>★</span>
+                      </div>
+                      <span style={{ fontWeight: "700", color: "#FFFFFF" }}>{prod.rating}</span>
+                      <span style={{ color: "#64748B", fontSize: "12px" }}>({prod.reviewCount})</span>
+                    </>
+                  ) : (
+                    <span style={{ color: "#10B981", fontSize: "11px", fontWeight: "700" }}>✓ VERIFIED LAB PURE</span>
+                  )}
                   <span style={{ color: "#334155", margin: "0 4px" }}>•</span>
                   <span style={{ fontSize: "11px", fontWeight: "700", color: "#8FB8D8", letterSpacing: "0.8px", textTransform: "uppercase" }}>
                     {prod.category}

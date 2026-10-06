@@ -8,10 +8,15 @@ import { useStore } from "@/context/StoreContext";
 import { adminProductApi } from "@/lib/api/adminProductApi";
 import { categoryApi, Category, Subcategory, Brand } from "@/lib/api/categoryApi";
 import { ProductSummary } from "@/lib/api/productApi";
+
 export default function AdminCataloguePage() {
   const { user, token, isAuthenticated, openAuthModal, quickLogin } = useAuth();
   const { showToast } = useStore();
 
+  // Top-level Navigation Tab
+  const [activeMainTab, setActiveMainTab] = useState<"PRODUCTS" | "CATEGORIES" | "SUBCATEGORIES" | "BRANDS">("PRODUCTS");
+
+  // Data States
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
@@ -20,13 +25,48 @@ export default function AdminCataloguePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "PUBLISHED" | "DRAFT" | "UNPUBLISHED">("ALL");
 
-  // Modal States
+  // Product Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductSummary | null>(null);
   const [formSubmitting, setFormSubmitting] = useState(false);
 
-  // Form Fields
+  // Category Modals
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [categoryFormData, setCategoryFormData] = useState({
+    name: "",
+    slug: "",
+    description: "",
+    imageUrl: "",
+    sortOrder: 1,
+    active: true,
+  });
+
+  // Subcategory Modals
+  const [isSubcategoryModalOpen, setIsSubcategoryModalOpen] = useState(false);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<Subcategory | null>(null);
+  const [subcategoryFormData, setSubcategoryFormData] = useState({
+    categoryId: "",
+    name: "",
+    slug: "",
+    description: "",
+    sortOrder: 1,
+    active: true,
+  });
+
+  // Brand Modals
+  const [isBrandModalOpen, setIsBrandModalOpen] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
+  const [brandFormData, setBrandFormData] = useState({
+    name: "",
+    slug: "",
+    description: "",
+    logoUrl: "",
+    active: true,
+  });
+
+  // Product Form Fields
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -54,9 +94,9 @@ export default function AdminCataloguePage() {
     try {
       const [prodPage, cats, subs, b] = await Promise.all([
         adminProductApi.listAdminProducts({ size: 50 }),
-        categoryApi.listCategories(),
-        categoryApi.listSubcategories(),
-        categoryApi.listBrands(),
+        categoryApi.adminListCategories().catch(() => categoryApi.listCategories()),
+        categoryApi.adminListSubcategories().catch(() => categoryApi.listSubcategories()),
+        categoryApi.adminListBrands().catch(() => categoryApi.listBrands()),
       ]);
 
       setProducts(prodPage?.content || []);
@@ -88,7 +128,7 @@ export default function AdminCataloguePage() {
     fetchData();
   }, [fetchData]);
 
-  // Handle Product Status Change (Publish / Unpublish / Draft)
+  // Product Status Change
   const handleStatusChange = async (productId: string, newStatus: "DRAFT" | "PUBLISHED" | "UNPUBLISHED") => {
     try {
       await adminProductApi.updateProductStatus(productId, newStatus);
@@ -101,10 +141,9 @@ export default function AdminCataloguePage() {
     }
   };
 
-  // Handle Delete / Deactivate Product
+  // Delete Product
   const handleDeleteProduct = async (productId: string, productName: string) => {
     if (!window.confirm(`Are you sure you want to deactivate/delete "${productName}"?`)) return;
-
     try {
       await adminProductApi.deleteProduct(productId);
       showToast(`Product "${productName}" deactivated successfully.`);
@@ -114,17 +153,15 @@ export default function AdminCataloguePage() {
     }
   };
 
-  // Handle Name Input with Auto Slug
+  // Name Auto Slug Helpers
+  const generateSlug = (val: string) =>
+    val.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-");
+
   const handleNameChange = (name: string) => {
-    const slug = name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-");
-    setFormData((prev) => ({ ...prev, name, slug }));
+    setFormData((prev) => ({ ...prev, name, slug: generateSlug(name) }));
   };
 
-  // Handle Create Product Submit
+  // Submit Create Product
   const handleCreateProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormSubmitting(true);
@@ -157,7 +194,7 @@ export default function AdminCataloguePage() {
     }
   };
 
-  // Open Edit Modal
+  // Open Edit Product Modal
   const openEditModal = (product: ProductSummary) => {
     setSelectedProduct(product);
     setFormData({
@@ -180,7 +217,7 @@ export default function AdminCataloguePage() {
     setIsEditModalOpen(true);
   };
 
-  // Handle Edit Submit
+  // Submit Edit Product
   const handleEditProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProduct) return;
@@ -214,6 +251,175 @@ export default function AdminCataloguePage() {
     }
   };
 
+  // Category Actions
+  const handleOpenCategoryModal = (cat?: Category) => {
+    if (cat) {
+      setSelectedCategory(cat);
+      setCategoryFormData({
+        name: cat.name,
+        slug: cat.slug,
+        description: cat.description || "",
+        imageUrl: cat.imageUrl || "",
+        sortOrder: cat.sortOrder || 1,
+        active: cat.active,
+      });
+    } else {
+      setSelectedCategory(null);
+      setCategoryFormData({
+        name: "",
+        slug: "",
+        description: "",
+        imageUrl: "",
+        sortOrder: (categories.length || 0) + 1,
+        active: true,
+      });
+    }
+    setIsCategoryModalOpen(true);
+  };
+
+  const handleCategorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormSubmitting(true);
+    try {
+      if (selectedCategory) {
+        await categoryApi.adminUpdateCategory(selectedCategory.id, categoryFormData);
+        showToast(`Category "${categoryFormData.name}" updated successfully!`);
+      } else {
+        await categoryApi.adminCreateCategory(categoryFormData);
+        showToast(`Category "${categoryFormData.name}" created successfully!`);
+      }
+      setIsCategoryModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message || "Error saving category");
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to deactivate/delete Category "${name}"?`)) return;
+    try {
+      await categoryApi.adminDeleteCategory(id);
+      showToast(`Category "${name}" removed/deactivated.`);
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message || "Error deleting category");
+    }
+  };
+
+  // Subcategory Actions
+  const handleOpenSubcategoryModal = (sub?: Subcategory) => {
+    if (sub) {
+      setSelectedSubcategory(sub);
+      setSubcategoryFormData({
+        categoryId: sub.categoryId,
+        name: sub.name,
+        slug: sub.slug,
+        description: sub.description || "",
+        sortOrder: sub.sortOrder || 1,
+        active: sub.active,
+      });
+    } else {
+      setSelectedSubcategory(null);
+      setSubcategoryFormData({
+        categoryId: categories[0]?.id || "",
+        name: "",
+        slug: "",
+        description: "",
+        sortOrder: (subcategories.length || 0) + 1,
+        active: true,
+      });
+    }
+    setIsSubcategoryModalOpen(true);
+  };
+
+  const handleSubcategorySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormSubmitting(true);
+    try {
+      if (selectedSubcategory) {
+        await categoryApi.adminUpdateSubcategory(selectedSubcategory.id, subcategoryFormData);
+        showToast(`Subcategory "${subcategoryFormData.name}" updated!`);
+      } else {
+        await categoryApi.adminCreateSubcategory(subcategoryFormData);
+        showToast(`Subcategory "${subcategoryFormData.name}" created!`);
+      }
+      setIsSubcategoryModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message || "Error saving subcategory");
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
+
+  const handleDeleteSubcategory = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to deactivate/delete Subcategory "${name}"?`)) return;
+    try {
+      await categoryApi.adminDeleteSubcategory(id);
+      showToast(`Subcategory "${name}" removed/deactivated.`);
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message || "Error deleting subcategory");
+    }
+  };
+
+  // Brand Actions
+  const handleOpenBrandModal = (brand?: Brand) => {
+    if (brand) {
+      setSelectedBrand(brand);
+      setBrandFormData({
+        name: brand.name,
+        slug: brand.slug,
+        description: brand.description || "",
+        logoUrl: brand.logoUrl || "",
+        active: brand.active,
+      });
+    } else {
+      setSelectedBrand(null);
+      setBrandFormData({
+        name: "",
+        slug: "",
+        description: "",
+        logoUrl: "",
+        active: true,
+      });
+    }
+    setIsBrandModalOpen(true);
+  };
+
+  const handleBrandSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormSubmitting(true);
+    try {
+      if (selectedBrand) {
+        await categoryApi.adminUpdateBrand(selectedBrand.id, brandFormData);
+        showToast(`Brand "${brandFormData.name}" updated!`);
+      } else {
+        await categoryApi.adminCreateBrand(brandFormData);
+        showToast(`Brand "${brandFormData.name}" created!`);
+      }
+      setIsBrandModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message || "Error saving brand");
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
+
+  const handleDeleteBrand = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to deactivate/delete Brand "${name}"?`)) return;
+    try {
+      await categoryApi.adminDeleteBrand(id);
+      showToast(`Brand "${name}" removed/deactivated.`);
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message || "Error deleting brand");
+    }
+  };
+
   // Filtered Products
   const filteredProducts = products.filter((p) => {
     const matchesSearch =
@@ -224,7 +430,7 @@ export default function AdminCataloguePage() {
     return matchesSearch && matchesStatus;
   });
 
-  // Access Denied / Role Required screen if not Admin/PM
+  // Access Denied Screen
   if (!isStaff) {
     return (
       <div style={{ backgroundColor: "#0A0D14", minHeight: "80vh", padding: "60px 20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -331,7 +537,7 @@ export default function AdminCataloguePage() {
               </span>
             </div>
             <p style={{ fontSize: "13.5px", color: "#94A3B8", margin: 0 }}>
-              Authenticated as <strong>{user?.firstName} {user?.lastName}</strong> ({user?.role}) • Full CRUD, Variants, Media &amp; Pricing Controls
+              Authenticated as <strong>{user?.firstName} {user?.lastName}</strong> ({user?.role}) • Full Categories, Brands, Products, Variants, SKUs, Media &amp; Pricing
             </p>
           </div>
 
@@ -353,43 +559,102 @@ export default function AdminCataloguePage() {
             >
               <span>🛍️ Storefront View</span>
             </Link>
-            <button
-              onClick={() => {
-                setFormData({
-                  name: "",
-                  slug: "",
-                  categoryId: categories[0]?.id || "",
-                  subcategoryId: subcategories[0]?.id || "",
-                  brandId: brands[0]?.id || "",
-                  startingPrice: 2499,
-                  compareAtPrice: 2999,
-                  badge: "NEW LAUNCH",
-                  goalTag: "Build Lean Muscle",
-                  highlight: "24g High Quality Protein • Zero Added Sugar",
-                  minimalDesc: "Advanced formula designed for athletic recovery and lean muscle synthesis.",
-                  ingredients: "Pure Whey Protein Isolate, Cocoa Powder, Sunflower Lecithin, Natural Flavors, Stevia Extract.",
-                  allergens: "Contains Milk and Dairy derivatives.",
-                  primaryImageUrl: "/assets/product-catalog/whey_isolated.png",
-                  status: "PUBLISHED",
-                });
-                setIsCreateModalOpen(true);
-              }}
-              style={{
-                padding: "10px 20px",
-                borderRadius: "8px",
-                backgroundColor: "var(--color-accent)",
-                color: "#0B0C0E",
-                fontSize: "13.5px",
-                fontWeight: "800",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                boxShadow: "0 4px 14px rgba(245, 158, 11, 0.3)",
-              }}
-            >
-              <span>+ CREATE PRODUCT</span>
-            </button>
+            {activeMainTab === "PRODUCTS" && (
+              <button
+                onClick={() => {
+                  setFormData({
+                    name: "",
+                    slug: "",
+                    categoryId: categories[0]?.id || "",
+                    subcategoryId: subcategories[0]?.id || "",
+                    brandId: brands[0]?.id || "",
+                    startingPrice: 2499,
+                    compareAtPrice: 2999,
+                    badge: "NEW LAUNCH",
+                    goalTag: "Build Lean Muscle",
+                    highlight: "24g High Quality Protein • Zero Added Sugar",
+                    minimalDesc: "Advanced formula designed for athletic recovery and lean muscle synthesis.",
+                    ingredients: "Pure Whey Protein Isolate, Cocoa Powder, Sunflower Lecithin, Natural Flavors, Stevia Extract.",
+                    allergens: "Contains Milk and Dairy derivatives.",
+                    primaryImageUrl: "/assets/product-catalog/whey_isolated.png",
+                    status: "PUBLISHED",
+                  });
+                  setIsCreateModalOpen(true);
+                }}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  backgroundColor: "var(--color-accent)",
+                  color: "#0B0C0E",
+                  fontSize: "13.5px",
+                  fontWeight: "800",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  boxShadow: "0 4px 14px rgba(245, 158, 11, 0.3)",
+                }}
+              >
+                <span>+ CREATE PRODUCT</span>
+              </button>
+            )}
+            {activeMainTab === "CATEGORIES" && (
+              <button
+                onClick={() => handleOpenCategoryModal()}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  backgroundColor: "var(--color-accent)",
+                  color: "#0B0C0E",
+                  fontSize: "13.5px",
+                  fontWeight: "800",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <span>+ NEW CATEGORY</span>
+              </button>
+            )}
+            {activeMainTab === "SUBCATEGORIES" && (
+              <button
+                onClick={() => handleOpenSubcategoryModal()}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  backgroundColor: "var(--color-accent)",
+                  color: "#0B0C0E",
+                  fontSize: "13.5px",
+                  fontWeight: "800",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <span>+ NEW SUBCATEGORY</span>
+              </button>
+            )}
+            {activeMainTab === "BRANDS" && (
+              <button
+                onClick={() => handleOpenBrandModal()}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  backgroundColor: "var(--color-accent)",
+                  color: "#0B0C0E",
+                  fontSize: "13.5px",
+                  fontWeight: "800",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <span>+ NEW BRAND</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -398,37 +663,67 @@ export default function AdminCataloguePage() {
       <div className="site-container" style={{ marginTop: "28px" }}>
         {/* Metric Cards Row */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px", marginBottom: "24px" }}>
-          <div style={{ backgroundColor: "#141824", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "10px", padding: "16px" }}>
-            <div style={{ fontSize: "12px", color: "#94A3B8", fontWeight: "700", marginBottom: "4px" }}>TOTAL PRODUCTS</div>
+          <div
+            onClick={() => setActiveMainTab("PRODUCTS")}
+            style={{
+              backgroundColor: "#141824",
+              border: activeMainTab === "PRODUCTS" ? "1.5px solid var(--color-accent)" : "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "10px",
+              padding: "16px",
+              cursor: "pointer",
+            }}
+          >
+            <div style={{ fontSize: "12px", color: "#94A3B8", fontWeight: "700", marginBottom: "4px" }}>📦 TOTAL PRODUCTS</div>
             <div style={{ fontSize: "28px", fontWeight: "800", color: "#FFF" }}>{products.length}</div>
           </div>
-          <div style={{ backgroundColor: "#141824", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "10px", padding: "16px" }}>
-            <div style={{ fontSize: "12px", color: "#10B981", fontWeight: "700", marginBottom: "4px" }}>PUBLISHED (LIVE)</div>
-            <div style={{ fontSize: "28px", fontWeight: "800", color: "#10B981" }}>
-              {products.filter((p) => p.status === "PUBLISHED").length}
-            </div>
+          <div
+            onClick={() => setActiveMainTab("CATEGORIES")}
+            style={{
+              backgroundColor: "#141824",
+              border: activeMainTab === "CATEGORIES" ? "1.5px solid var(--color-accent)" : "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "10px",
+              padding: "16px",
+              cursor: "pointer",
+            }}
+          >
+            <div style={{ fontSize: "12px", color: "#10B981", fontWeight: "700", marginBottom: "4px" }}>🏷️ CATEGORIES</div>
+            <div style={{ fontSize: "28px", fontWeight: "800", color: "#10B981" }}>{categories.length}</div>
           </div>
-          <div style={{ backgroundColor: "#141824", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "10px", padding: "16px" }}>
-            <div style={{ fontSize: "12px", color: "#F59E0B", fontWeight: "700", marginBottom: "4px" }}>DRAFTS</div>
-            <div style={{ fontSize: "28px", fontWeight: "800", color: "#F59E0B" }}>
-              {products.filter((p) => p.status === "DRAFT").length}
-            </div>
+          <div
+            onClick={() => setActiveMainTab("SUBCATEGORIES")}
+            style={{
+              backgroundColor: "#141824",
+              border: activeMainTab === "SUBCATEGORIES" ? "1.5px solid var(--color-accent)" : "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "10px",
+              padding: "16px",
+              cursor: "pointer",
+            }}
+          >
+            <div style={{ fontSize: "12px", color: "#F59E0B", fontWeight: "700", marginBottom: "4px" }}>📑 SUBCATEGORIES</div>
+            <div style={{ fontSize: "28px", fontWeight: "800", color: "#F59E0B" }}>{subcategories.length}</div>
           </div>
-          <div style={{ backgroundColor: "#141824", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "10px", padding: "16px" }}>
-            <div style={{ fontSize: "12px", color: "#94A3B8", fontWeight: "700", marginBottom: "4px" }}>CATEGORIES / BRANDS</div>
-            <div style={{ fontSize: "28px", fontWeight: "800", color: "var(--color-accent)" }}>
-              {categories.length} / {brands.length}
-            </div>
+          <div
+            onClick={() => setActiveMainTab("BRANDS")}
+            style={{
+              backgroundColor: "#141824",
+              border: activeMainTab === "BRANDS" ? "1.5px solid var(--color-accent)" : "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "10px",
+              padding: "16px",
+              cursor: "pointer",
+            }}
+          >
+            <div style={{ fontSize: "12px", color: "#38BDF8", fontWeight: "700", marginBottom: "4px" }}>🏢 BRANDS</div>
+            <div style={{ fontSize: "28px", fontWeight: "800", color: "#38BDF8" }}>{brands.length}</div>
           </div>
         </div>
 
-        {/* Filters and Search Row */}
+        {/* Top-Level Section Navigation Bar */}
         <div
           style={{
             backgroundColor: "#141824",
             border: "1px solid rgba(255, 255, 255, 0.08)",
             borderRadius: "10px",
-            padding: "16px 20px",
+            padding: "12px 18px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -437,31 +732,53 @@ export default function AdminCataloguePage() {
             marginBottom: "20px",
           }}
         >
-          {/* Status Tabs */}
+          {/* Main Tabs */}
           <div style={{ display: "flex", gap: "8px" }}>
-            {(["ALL", "PUBLISHED", "DRAFT", "UNPUBLISHED"] as const).map((tab) => (
+            {(["PRODUCTS", "CATEGORIES", "SUBCATEGORIES", "BRANDS"] as const).map((tab) => (
               <button
                 key={tab}
-                onClick={() => setStatusFilter(tab)}
+                onClick={() => setActiveMainTab(tab)}
                 style={{
-                  padding: "7px 14px",
+                  padding: "8px 16px",
                   borderRadius: "6px",
-                  fontSize: "12px",
+                  fontSize: "12.5px",
                   fontWeight: "800",
                   cursor: "pointer",
-                  backgroundColor: statusFilter === tab ? "var(--color-accent)" : "rgba(255, 255, 255, 0.05)",
-                  color: statusFilter === tab ? "#0B0C0E" : "#94A3B8",
-                  border: statusFilter === tab ? "none" : "1px solid rgba(255, 255, 255, 0.08)",
+                  backgroundColor: activeMainTab === tab ? "var(--color-accent)" : "rgba(255, 255, 255, 0.05)",
+                  color: activeMainTab === tab ? "#0B0C0E" : "#94A3B8",
+                  border: activeMainTab === tab ? "none" : "1px solid rgba(255, 255, 255, 0.08)",
                   transition: "all 0.15s ease",
                 }}
               >
-                {tab}
+                {tab === "PRODUCTS" ? "📦 Products" : tab === "CATEGORIES" ? "🏷️ Categories" : tab === "SUBCATEGORIES" ? "📑 Subcategories" : "🏢 Brands"}
               </button>
             ))}
           </div>
 
-          {/* Search Box */}
+          {/* Search Box & Refresh */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {activeMainTab === "PRODUCTS" && (
+              <div style={{ display: "flex", gap: "6px" }}>
+                {(["ALL", "PUBLISHED", "DRAFT", "UNPUBLISHED"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setStatusFilter(tab)}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "6px",
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      backgroundColor: statusFilter === tab ? "rgba(245, 158, 11, 0.2)" : "transparent",
+                      color: statusFilter === tab ? "#FBBF24" : "#64748B",
+                      border: statusFilter === tab ? "1px solid #F59E0B" : "1px solid transparent",
+                    }}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+            )}
             <div
               style={{
                 display: "flex",
@@ -471,7 +788,7 @@ export default function AdminCataloguePage() {
                 borderRadius: "8px",
                 padding: "0 12px",
                 height: "38px",
-                width: "260px",
+                width: "220px",
               }}
             >
               <span style={{ marginRight: "8px", color: "#64748B" }}>🔍</span>
@@ -479,7 +796,7 @@ export default function AdminCataloguePage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products..."
+                placeholder="Search..."
                 style={{
                   border: "none",
                   background: "none",
@@ -492,7 +809,7 @@ export default function AdminCataloguePage() {
             </div>
             <button
               onClick={fetchData}
-              title="Refresh"
+              title="Refresh Data from Server"
               style={{
                 height: "38px",
                 padding: "0 12px",
@@ -509,225 +826,471 @@ export default function AdminCataloguePage() {
           </div>
         </div>
 
-        {/* Product Catalogue Table */}
-        <div
-          style={{
-            backgroundColor: "#141824",
-            border: "1px solid rgba(255, 255, 255, 0.08)",
-            borderRadius: "12px",
-            overflow: "hidden",
-          }}
-        >
-          {loading ? (
-            <div style={{ padding: "40px", textAlign: "center", color: "#94A3B8" }}>
-              ⏳ Loading products from PostgreSQL 18...
-            </div>
-          ) : filteredProducts.length === 0 ? (
-            <div style={{ padding: "50px", textAlign: "center", color: "#94A3B8" }}>
-              <div style={{ fontSize: "36px", marginBottom: "12px" }}>📦</div>
-              <div style={{ fontSize: "16px", fontWeight: "700", color: "#FFF" }}>No products found</div>
-              <p style={{ fontSize: "13px", marginTop: "4px" }}>Create your first product using the button above.</p>
-            </div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13.5px" }}>
-                <thead>
-                  <tr style={{ backgroundColor: "#0F131D", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", color: "#94A3B8", fontSize: "11.5px", textTransform: "uppercase" }}>
-                    <th style={{ padding: "14px 18px" }}>Product</th>
-                    <th style={{ padding: "14px 18px" }}>Category &amp; Brand</th>
-                    <th style={{ padding: "14px 18px" }}>Price</th>
-                    <th style={{ padding: "14px 18px" }}>Status</th>
-                    <th style={{ padding: "14px 18px", textAlign: "right" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProducts.map((p) => {
-                    const statusColor =
-                      p.status === "PUBLISHED" ? "#10B981" : p.status === "DRAFT" ? "#F59E0B" : "#94A3B8";
+        {/* ============================================================= */}
+        {/* TAB 1: PRODUCTS TABLE                                          */}
+        {/* ============================================================= */}
+        {activeMainTab === "PRODUCTS" && (
+          <div
+            style={{
+              backgroundColor: "#141824",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "12px",
+              overflow: "hidden",
+            }}
+          >
+            {loading ? (
+              <div style={{ padding: "40px", textAlign: "center", color: "#94A3B8" }}>
+                ⏳ Loading products from PostgreSQL 18...
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div style={{ padding: "50px", textAlign: "center", color: "#94A3B8" }}>
+                <div style={{ fontSize: "36px", marginBottom: "12px" }}>📦</div>
+                <div style={{ fontSize: "16px", fontWeight: "700", color: "#FFF" }}>No products found</div>
+                <p style={{ fontSize: "13px", marginTop: "4px" }}>Create your first product using the button above.</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13.5px" }}>
+                  <thead>
+                    <tr style={{ backgroundColor: "#0F131D", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", color: "#94A3B8", fontSize: "11.5px", textTransform: "uppercase" }}>
+                      <th style={{ padding: "14px 18px" }}>Product</th>
+                      <th style={{ padding: "14px 18px" }}>Category &amp; Brand</th>
+                      <th style={{ padding: "14px 18px" }}>Price</th>
+                      <th style={{ padding: "14px 18px" }}>Status</th>
+                      <th style={{ padding: "14px 18px", textAlign: "right" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredProducts.map((p) => {
+                      const statusColor =
+                        p.status === "PUBLISHED" ? "#10B981" : p.status === "DRAFT" ? "#F59E0B" : "#94A3B8";
 
-                    return (
-                      <tr
-                        key={p.id}
+                      return (
+                        <tr
+                          key={p.id}
+                          style={{
+                            borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+                            transition: "background-color 0.15s ease",
+                          }}
+                        >
+                          <td style={{ padding: "14px 18px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                              <div
+                                style={{
+                                  width: "48px",
+                                  height: "48px",
+                                  borderRadius: "8px",
+                                  backgroundColor: "#0B0C0E",
+                                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                                  position: "relative",
+                                  overflow: "hidden",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <Image
+                                  src={p.primaryImageUrl || "/assets/product-catalog/whey_isolated.png"}
+                                  alt={p.name}
+                                  fill
+                                  style={{ objectFit: "contain", padding: "4px" }}
+                                />
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: "800", color: "#FFF", fontSize: "14px" }}>{p.name}</div>
+                                <div style={{ fontSize: "11px", color: "#64748B", fontFamily: "monospace" }}>
+                                  slug: {p.slug}
+                                </div>
+                                {p.badge && (
+                                  <span
+                                    style={{
+                                      fontSize: "9.5px",
+                                      fontWeight: "800",
+                                      color: "var(--color-accent)",
+                                      backgroundColor: "rgba(245, 158, 11, 0.15)",
+                                      padding: "2px 6px",
+                                      borderRadius: "4px",
+                                      display: "inline-block",
+                                      marginTop: "3px",
+                                    }}
+                                  >
+                                    {p.badge}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          <td style={{ padding: "14px 18px" }}>
+                            <div style={{ color: "#FFF", fontWeight: "700" }}>{p.categoryName || "General"}</div>
+                            <div style={{ fontSize: "12px", color: "#94A3B8" }}>
+                              Sub: {p.subcategoryName || "—"} | Brand: {p.brandName || "PROVANA"}
+                            </div>
+                          </td>
+
+                          <td style={{ padding: "14px 18px" }}>
+                            <div style={{ fontWeight: "800", color: "#FFF" }}>₹{p.startingPrice?.toLocaleString("en-IN")}</div>
+                            {p.compareAtPrice && p.compareAtPrice > p.startingPrice && (
+                              <div style={{ fontSize: "11.5px", color: "#64748B", textDecoration: "line-through" }}>
+                                ₹{p.compareAtPrice?.toLocaleString("en-IN")}
+                              </div>
+                            )}
+                          </td>
+
+                          <td style={{ padding: "14px 18px" }}>
+                            <select
+                              value={p.status}
+                              onChange={(e) =>
+                                handleStatusChange(p.id, e.target.value as "DRAFT" | "PUBLISHED" | "UNPUBLISHED")
+                              }
+                              style={{
+                                backgroundColor: `${statusColor}18`,
+                                color: statusColor,
+                                border: `1px solid ${statusColor}44`,
+                                borderRadius: "6px",
+                                padding: "4px 8px",
+                                fontSize: "12px",
+                                fontWeight: "800",
+                                cursor: "pointer",
+                                outline: "none",
+                              }}
+                            >
+                              <option value="PUBLISHED" style={{ backgroundColor: "#141824", color: "#10B981" }}>
+                                ● PUBLISHED
+                              </option>
+                              <option value="DRAFT" style={{ backgroundColor: "#141824", color: "#F59E0B" }}>
+                                ● DRAFT
+                              </option>
+                              <option value="UNPUBLISHED" style={{ backgroundColor: "#141824", color: "#94A3B8" }}>
+                                ● UNPUBLISHED
+                              </option>
+                            </select>
+                          </td>
+
+                          <td style={{ padding: "14px 18px", textAlign: "right" }}>
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                              <Link
+                                href={`/products/${p.slug}`}
+                                target="_blank"
+                                title="View PDP"
+                                style={{
+                                  padding: "6px 10px",
+                                  borderRadius: "6px",
+                                  backgroundColor: "rgba(255, 255, 255, 0.08)",
+                                  color: "#CBD5E1",
+                                  fontSize: "12px",
+                                  fontWeight: "700",
+                                }}
+                              >
+                                👁️
+                              </Link>
+                              <Link
+                                href={`/admin/products/${p.id}`}
+                                title="Manage Variants, SKUs, Media, Nutrition & FAQs"
+                                style={{
+                                  padding: "6px 12px",
+                                  borderRadius: "6px",
+                                  backgroundColor: "rgba(59, 130, 246, 0.15)",
+                                  border: "1px solid rgba(59, 130, 246, 0.35)",
+                                  color: "#60A5FA",
+                                  fontSize: "12px",
+                                  fontWeight: "700",
+                                  textDecoration: "none",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                }}
+                              >
+                                ⚙️ Manage
+                              </Link>
+                              <button
+                                onClick={() => openEditModal(p)}
+                                title="Edit Product"
+                                style={{
+                                  padding: "6px 12px",
+                                  borderRadius: "6px",
+                                  backgroundColor: "rgba(245, 158, 11, 0.15)",
+                                  border: "1px solid rgba(245, 158, 11, 0.35)",
+                                  color: "#FBBF24",
+                                  fontSize: "12px",
+                                  fontWeight: "700",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                ✏️ Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteProduct(p.id, p.name)}
+                                title="Delete or Deactivate"
+                                style={{
+                                  padding: "6px 10px",
+                                  borderRadius: "6px",
+                                  backgroundColor: "rgba(239, 68, 68, 0.12)",
+                                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                                  color: "#EF4444",
+                                  fontSize: "12px",
+                                  fontWeight: "700",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ============================================================= */}
+        {/* TAB 2: CATEGORIES TABLE                                       */}
+        {/* ============================================================= */}
+        {activeMainTab === "CATEGORIES" && (
+          <div
+            style={{
+              backgroundColor: "#141824",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "12px",
+              overflow: "hidden",
+            }}
+          >
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13.5px" }}>
+              <thead>
+                <tr style={{ backgroundColor: "#0F131D", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", color: "#94A3B8", fontSize: "11.5px", textTransform: "uppercase" }}>
+                  <th style={{ padding: "14px 18px" }}>Category Name</th>
+                  <th style={{ padding: "14px 18px" }}>Slug</th>
+                  <th style={{ padding: "14px 18px" }}>Sort Order</th>
+                  <th style={{ padding: "14px 18px" }}>Status</th>
+                  <th style={{ padding: "14px 18px", textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map((cat) => (
+                  <tr key={cat.id} style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                    <td style={{ padding: "14px 18px", fontWeight: "800", color: "#FFF" }}>{cat.name}</td>
+                    <td style={{ padding: "14px 18px", fontFamily: "monospace", color: "#64748B" }}>{cat.slug}</td>
+                    <td style={{ padding: "14px 18px", color: "#94A3B8" }}>{cat.sortOrder}</td>
+                    <td style={{ padding: "14px 18px" }}>
+                      <span
                         style={{
-                          borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
-                          transition: "background-color 0.15s ease",
+                          fontSize: "11px",
+                          fontWeight: "800",
+                          padding: "3px 8px",
+                          borderRadius: "4px",
+                          backgroundColor: cat.active ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                          color: cat.active ? "#10B981" : "#EF4444",
                         }}
                       >
-                        {/* Thumbnail & Name */}
-                        <td style={{ padding: "14px 18px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                            <div
-                              style={{
-                                width: "48px",
-                                height: "48px",
-                                borderRadius: "8px",
-                                backgroundColor: "#0B0C0E",
-                                border: "1px solid rgba(255, 255, 255, 0.1)",
-                                position: "relative",
-                                overflow: "hidden",
-                                flexShrink: 0,
-                              }}
-                            >
-                              <Image
-                                src={p.primaryImageUrl || "/assets/product-catalog/whey_isolated.png"}
-                                alt={p.name}
-                                fill
-                                style={{ objectFit: "contain", padding: "4px" }}
-                              />
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: "800", color: "#FFF", fontSize: "14px" }}>{p.name}</div>
-                              <div style={{ fontSize: "11px", color: "#64748B", fontFamily: "monospace" }}>
-                                slug: {p.slug}
-                              </div>
-                              {p.badge && (
-                                <span
-                                  style={{
-                                    fontSize: "9.5px",
-                                    fontWeight: "800",
-                                    color: "var(--color-accent)",
-                                    backgroundColor: "rgba(245, 158, 11, 0.15)",
-                                    padding: "2px 6px",
-                                    borderRadius: "4px",
-                                    display: "inline-block",
-                                    marginTop: "3px",
-                                  }}
-                                >
-                                  {p.badge}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
+                        {cat.active ? "ACTIVE" : "INACTIVE"}
+                      </span>
+                    </td>
+                    <td style={{ padding: "14px 18px", textAlign: "right" }}>
+                      <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                        <button
+                          onClick={() => handleOpenCategoryModal(cat)}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "6px",
+                            backgroundColor: "rgba(245, 158, 11, 0.15)",
+                            border: "1px solid rgba(245, 158, 11, 0.35)",
+                            color: "#FBBF24",
+                            fontSize: "12px",
+                            fontWeight: "700",
+                            cursor: "pointer",
+                          }}
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: "6px",
+                            backgroundColor: "rgba(239, 68, 68, 0.12)",
+                            border: "1px solid rgba(239, 68, 68, 0.3)",
+                            color: "#EF4444",
+                            fontSize: "12px",
+                            fontWeight: "700",
+                            cursor: "pointer",
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-                        {/* Category & Brand */}
-                        <td style={{ padding: "14px 18px" }}>
-                          <div style={{ color: "#FFF", fontWeight: "700" }}>{p.categoryName || "General"}</div>
-                          <div style={{ fontSize: "12px", color: "#94A3B8" }}>
-                            Sub: {p.subcategoryName || "—"} | Brand: {p.brandName || "PROVANA"}
-                          </div>
-                        </td>
+        {/* ============================================================= */}
+        {/* TAB 3: SUBCATEGORIES TABLE                                    */}
+        {/* ============================================================= */}
+        {activeMainTab === "SUBCATEGORIES" && (
+          <div
+            style={{
+              backgroundColor: "#141824",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "12px",
+              overflow: "hidden",
+            }}
+          >
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13.5px" }}>
+              <thead>
+                <tr style={{ backgroundColor: "#0F131D", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", color: "#94A3B8", fontSize: "11.5px", textTransform: "uppercase" }}>
+                  <th style={{ padding: "14px 18px" }}>Subcategory</th>
+                  <th style={{ padding: "14px 18px" }}>Parent Category</th>
+                  <th style={{ padding: "14px 18px" }}>Slug</th>
+                  <th style={{ padding: "14px 18px" }}>Status</th>
+                  <th style={{ padding: "14px 18px", textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subcategories.map((sub) => (
+                  <tr key={sub.id} style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                    <td style={{ padding: "14px 18px", fontWeight: "800", color: "#FFF" }}>{sub.name}</td>
+                    <td style={{ padding: "14px 18px", color: "var(--color-accent)", fontWeight: "700" }}>{sub.categoryName || "—"}</td>
+                    <td style={{ padding: "14px 18px", fontFamily: "monospace", color: "#64748B" }}>{sub.slug}</td>
+                    <td style={{ padding: "14px 18px" }}>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: "800",
+                          padding: "3px 8px",
+                          borderRadius: "4px",
+                          backgroundColor: sub.active ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                          color: sub.active ? "#10B981" : "#EF4444",
+                        }}
+                      >
+                        {sub.active ? "ACTIVE" : "INACTIVE"}
+                      </span>
+                    </td>
+                    <td style={{ padding: "14px 18px", textAlign: "right" }}>
+                      <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                        <button
+                          onClick={() => handleOpenSubcategoryModal(sub)}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "6px",
+                            backgroundColor: "rgba(245, 158, 11, 0.15)",
+                            border: "1px solid rgba(245, 158, 11, 0.35)",
+                            color: "#FBBF24",
+                            fontSize: "12px",
+                            fontWeight: "700",
+                            cursor: "pointer",
+                          }}
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSubcategory(sub.id, sub.name)}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: "6px",
+                            backgroundColor: "rgba(239, 68, 68, 0.12)",
+                            border: "1px solid rgba(239, 68, 68, 0.3)",
+                            color: "#EF4444",
+                            fontSize: "12px",
+                            fontWeight: "700",
+                            cursor: "pointer",
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-                        {/* Price */}
-                        <td style={{ padding: "14px 18px" }}>
-                          <div style={{ fontWeight: "800", color: "#FFF" }}>₹{p.startingPrice?.toLocaleString("en-IN")}</div>
-                          {p.compareAtPrice && p.compareAtPrice > p.startingPrice && (
-                            <div style={{ fontSize: "11.5px", color: "#64748B", textDecoration: "line-through" }}>
-                              ₹{p.compareAtPrice?.toLocaleString("en-IN")}
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Status Toggle Dropdown */}
-                        <td style={{ padding: "14px 18px" }}>
-                          <select
-                            value={p.status}
-                            onChange={(e) =>
-                              handleStatusChange(p.id, e.target.value as "DRAFT" | "PUBLISHED" | "UNPUBLISHED")
-                            }
-                            style={{
-                              backgroundColor: `${statusColor}18`,
-                              color: statusColor,
-                              border: `1px solid ${statusColor}44`,
-                              borderRadius: "6px",
-                              padding: "4px 8px",
-                              fontSize: "12px",
-                              fontWeight: "800",
-                              cursor: "pointer",
-                              outline: "none",
-                            }}
-                          >
-                            <option value="PUBLISHED" style={{ backgroundColor: "#141824", color: "#10B981" }}>
-                              ● PUBLISHED
-                            </option>
-                            <option value="DRAFT" style={{ backgroundColor: "#141824", color: "#F59E0B" }}>
-                              ● DRAFT
-                            </option>
-                            <option value="UNPUBLISHED" style={{ backgroundColor: "#141824", color: "#94A3B8" }}>
-                              ● UNPUBLISHED
-                            </option>
-                          </select>
-                        </td>
-
-                        {/* Actions */}
-                        <td style={{ padding: "14px 18px", textAlign: "right" }}>
-                          <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                            <Link
-                              href={`/products/${p.slug}`}
-                              target="_blank"
-                              title="View PDP"
-                              style={{
-                                padding: "6px 10px",
-                                borderRadius: "6px",
-                                backgroundColor: "rgba(255, 255, 255, 0.08)",
-                                color: "#CBD5E1",
-                                fontSize: "12px",
-                                fontWeight: "700",
-                              }}
-                            >
-                              👁️
-                            </Link>
-                            <Link
-                              href={`/admin/products/${p.id}`}
-                              title="Manage Variants, SKUs, Media, Nutrition & FAQs"
-                              style={{
-                                padding: "6px 12px",
-                                borderRadius: "6px",
-                                backgroundColor: "rgba(59, 130, 246, 0.15)",
-                                border: "1px solid rgba(59, 130, 246, 0.35)",
-                                color: "#60A5FA",
-                                fontSize: "12px",
-                                fontWeight: "700",
-                                textDecoration: "none",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "4px",
-                              }}
-                            >
-                              ⚙️ Manage
-                            </Link>
-                            <button
-                              onClick={() => openEditModal(p)}
-                              title="Edit Product"
-                              style={{
-                                padding: "6px 12px",
-                                borderRadius: "6px",
-                                backgroundColor: "rgba(245, 158, 11, 0.15)",
-                                border: "1px solid rgba(245, 158, 11, 0.35)",
-                                color: "#FBBF24",
-                                fontSize: "12px",
-                                fontWeight: "700",
-                                cursor: "pointer",
-                              }}
-                            >
-                              ✏️ Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteProduct(p.id, p.name)}
-                              title="Delete or Deactivate"
-                              style={{
-                                padding: "6px 10px",
-                                borderRadius: "6px",
-                                backgroundColor: "rgba(239, 68, 68, 0.12)",
-                                border: "1px solid rgba(239, 68, 68, 0.3)",
-                                color: "#EF4444",
-                                fontSize: "12px",
-                                fontWeight: "700",
-                                cursor: "pointer",
-                              }}
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        {/* ============================================================= */}
+        {/* TAB 4: BRANDS TABLE                                           */}
+        {/* ============================================================= */}
+        {activeMainTab === "BRANDS" && (
+          <div
+            style={{
+              backgroundColor: "#141824",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "12px",
+              overflow: "hidden",
+            }}
+          >
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13.5px" }}>
+              <thead>
+                <tr style={{ backgroundColor: "#0F131D", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", color: "#94A3B8", fontSize: "11.5px", textTransform: "uppercase" }}>
+                  <th style={{ padding: "14px 18px" }}>Brand Name</th>
+                  <th style={{ padding: "14px 18px" }}>Slug</th>
+                  <th style={{ padding: "14px 18px" }}>Status</th>
+                  <th style={{ padding: "14px 18px", textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {brands.map((b) => (
+                  <tr key={b.id} style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                    <td style={{ padding: "14px 18px", fontWeight: "800", color: "#FFF" }}>{b.name}</td>
+                    <td style={{ padding: "14px 18px", fontFamily: "monospace", color: "#64748B" }}>{b.slug}</td>
+                    <td style={{ padding: "14px 18px" }}>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: "800",
+                          padding: "3px 8px",
+                          borderRadius: "4px",
+                          backgroundColor: b.active ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                          color: b.active ? "#10B981" : "#EF4444",
+                        }}
+                      >
+                        {b.active ? "ACTIVE" : "INACTIVE"}
+                      </span>
+                    </td>
+                    <td style={{ padding: "14px 18px", textAlign: "right" }}>
+                      <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                        <button
+                          onClick={() => handleOpenBrandModal(b)}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "6px",
+                            backgroundColor: "rgba(245, 158, 11, 0.15)",
+                            border: "1px solid rgba(245, 158, 11, 0.35)",
+                            color: "#FBBF24",
+                            fontSize: "12px",
+                            fontWeight: "700",
+                            cursor: "pointer",
+                          }}
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteBrand(b.id, b.name)}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: "6px",
+                            backgroundColor: "rgba(239, 68, 68, 0.12)",
+                            border: "1px solid rgba(239, 68, 68, 0.3)",
+                            color: "#EF4444",
+                            fontSize: "12px",
+                            fontWeight: "700",
+                            cursor: "pointer",
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* ================================================================= */}
@@ -776,7 +1339,6 @@ export default function AdminCataloguePage() {
             </div>
 
             <form onSubmit={handleCreateProductSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-              {/* Product Name */}
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>
                   PRODUCT NAME *
@@ -791,7 +1353,6 @@ export default function AdminCataloguePage() {
                 />
               </div>
 
-              {/* Slug */}
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>
                   SLUG (URL PATH) *
@@ -806,8 +1367,7 @@ export default function AdminCataloguePage() {
                 />
               </div>
 
-              {/* Category & Subcategory Selection */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>
                     CATEGORY *
@@ -840,9 +1400,24 @@ export default function AdminCataloguePage() {
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>
+                    BRAND *
+                  </label>
+                  <select
+                    value={formData.brandId}
+                    onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}
+                    style={{ width: "100%", height: "42px", padding: "0 10px", borderRadius: "6px", backgroundColor: "#0D1016", border: "1px solid #2B3342", color: "#FFF", fontSize: "13px" }}
+                  >
+                    {brands.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              {/* Highlights & Badge */}
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "12px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>
@@ -870,7 +1445,6 @@ export default function AdminCataloguePage() {
                 </div>
               </div>
 
-              {/* Minimal Description */}
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>
                   MINIMAL DESCRIPTION
@@ -883,7 +1457,6 @@ export default function AdminCataloguePage() {
                 />
               </div>
 
-              {/* Ingredients & Allergens */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>
@@ -909,7 +1482,6 @@ export default function AdminCataloguePage() {
                 </div>
               </div>
 
-              {/* Status */}
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>
                   INITIAL STATUS
@@ -1112,6 +1684,266 @@ export default function AdminCataloguePage() {
                   }}
                 >
                   {formSubmitting ? "UPDATING..." : "UPDATE PRODUCT 💾"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* CATEGORY CREATE/EDIT MODAL                                        */}
+      {/* ================================================================= */}
+      {isCategoryModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.85)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            zIndex: 100000,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsCategoryModalOpen(false);
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#141824",
+              border: "1.5px solid rgba(255, 255, 255, 0.15)",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "500px",
+              padding: "24px",
+              color: "#FFF",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h3 className="font-display" style={{ fontSize: "20px", margin: 0 }}>
+                {selectedCategory ? `EDIT CATEGORY: ${selectedCategory.name}` : "CREATE NEW CATEGORY"}
+              </h3>
+              <button onClick={() => setIsCategoryModalOpen(false)} style={{ background: "none", border: "none", color: "#94A3B8", fontSize: "18px", cursor: "pointer" }}>✕</button>
+            </div>
+            <form onSubmit={handleCategorySubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>NAME *</label>
+                <input
+                  type="text"
+                  value={categoryFormData.name}
+                  onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value, slug: generateSlug(e.target.value) })}
+                  required
+                  style={{ width: "100%", height: "40px", padding: "0 12px", borderRadius: "6px", backgroundColor: "#0D1016", border: "1px solid #2B3342", color: "#FFF" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>SLUG *</label>
+                <input
+                  type="text"
+                  value={categoryFormData.slug}
+                  onChange={(e) => setCategoryFormData({ ...categoryFormData, slug: e.target.value })}
+                  required
+                  style={{ width: "100%", height: "40px", padding: "0 12px", borderRadius: "6px", backgroundColor: "#0D1016", border: "1px solid #2B3342", color: "#FFF", fontFamily: "monospace" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>DESCRIPTION</label>
+                <textarea
+                  rows={2}
+                  value={categoryFormData.description}
+                  onChange={(e) => setCategoryFormData({ ...categoryFormData, description: e.target.value })}
+                  style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", backgroundColor: "#0D1016", border: "1px solid #2B3342", color: "#FFF" }}
+                />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "11.5px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>SORT ORDER</label>
+                  <input
+                    type="number"
+                    value={categoryFormData.sortOrder}
+                    onChange={(e) => setCategoryFormData({ ...categoryFormData, sortOrder: parseInt(e.target.value) || 1 })}
+                    style={{ width: "100%", height: "40px", padding: "0 12px", borderRadius: "6px", backgroundColor: "#0D1016", border: "1px solid #2B3342", color: "#FFF" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "11.5px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>ACTIVE</label>
+                  <select
+                    value={categoryFormData.active ? "true" : "false"}
+                    onChange={(e) => setCategoryFormData({ ...categoryFormData, active: e.target.value === "true" })}
+                    style={{ width: "100%", height: "40px", padding: "0 10px", borderRadius: "6px", backgroundColor: "#0D1016", border: "1px solid #2B3342", color: "#FFF" }}
+                  >
+                    <option value="true">YES (Active)</option>
+                    <option value="false">NO (Inactive)</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                <button type="button" onClick={() => setIsCategoryModalOpen(false)} style={{ flex: 1, height: "42px", borderRadius: "6px", backgroundColor: "#252B37", color: "#FFF", fontWeight: "700", border: "none" }}>Cancel</button>
+                <button type="submit" disabled={formSubmitting} style={{ flex: 2, height: "42px", borderRadius: "6px", backgroundColor: "var(--color-accent)", color: "#0B0C0E", fontWeight: "800", border: "none" }}>
+                  {formSubmitting ? "Saving..." : selectedCategory ? "Update Category" : "Create Category"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* SUBCATEGORY CREATE/EDIT MODAL                                     */}
+      {/* ================================================================= */}
+      {isSubcategoryModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.85)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            zIndex: 100000,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsSubcategoryModalOpen(false);
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#141824",
+              border: "1.5px solid rgba(255, 255, 255, 0.15)",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "500px",
+              padding: "24px",
+              color: "#FFF",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h3 className="font-display" style={{ fontSize: "20px", margin: 0 }}>
+                {selectedSubcategory ? `EDIT SUBCATEGORY: ${selectedSubcategory.name}` : "CREATE SUBCATEGORY"}
+              </h3>
+              <button onClick={() => setIsSubcategoryModalOpen(false)} style={{ background: "none", border: "none", color: "#94A3B8", fontSize: "18px", cursor: "pointer" }}>✕</button>
+            </div>
+            <form onSubmit={handleSubcategorySubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>PARENT CATEGORY *</label>
+                <select
+                  value={subcategoryFormData.categoryId}
+                  onChange={(e) => setSubcategoryFormData({ ...subcategoryFormData, categoryId: e.target.value })}
+                  required
+                  style={{ width: "100%", height: "40px", padding: "0 10px", borderRadius: "6px", backgroundColor: "#0D1016", border: "1px solid #2B3342", color: "#FFF" }}
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>NAME *</label>
+                <input
+                  type="text"
+                  value={subcategoryFormData.name}
+                  onChange={(e) => setSubcategoryFormData({ ...subcategoryFormData, name: e.target.value, slug: generateSlug(e.target.value) })}
+                  required
+                  style={{ width: "100%", height: "40px", padding: "0 12px", borderRadius: "6px", backgroundColor: "#0D1016", border: "1px solid #2B3342", color: "#FFF" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>SLUG *</label>
+                <input
+                  type="text"
+                  value={subcategoryFormData.slug}
+                  onChange={(e) => setSubcategoryFormData({ ...subcategoryFormData, slug: e.target.value })}
+                  required
+                  style={{ width: "100%", height: "40px", padding: "0 12px", borderRadius: "6px", backgroundColor: "#0D1016", border: "1px solid #2B3342", color: "#FFF", fontFamily: "monospace" }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                <button type="button" onClick={() => setIsSubcategoryModalOpen(false)} style={{ flex: 1, height: "42px", borderRadius: "6px", backgroundColor: "#252B37", color: "#FFF", fontWeight: "700", border: "none" }}>Cancel</button>
+                <button type="submit" disabled={formSubmitting} style={{ flex: 2, height: "42px", borderRadius: "6px", backgroundColor: "var(--color-accent)", color: "#0B0C0E", fontWeight: "800", border: "none" }}>
+                  {formSubmitting ? "Saving..." : selectedSubcategory ? "Update Subcategory" : "Create Subcategory"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* BRAND CREATE/EDIT MODAL                                           */}
+      {/* ================================================================= */}
+      {isBrandModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.85)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            zIndex: 100000,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsBrandModalOpen(false);
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#141824",
+              border: "1.5px solid rgba(255, 255, 255, 0.15)",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "500px",
+              padding: "24px",
+              color: "#FFF",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h3 className="font-display" style={{ fontSize: "20px", margin: 0 }}>
+                {selectedBrand ? `EDIT BRAND: ${selectedBrand.name}` : "CREATE NEW BRAND"}
+              </h3>
+              <button onClick={() => setIsBrandModalOpen(false)} style={{ background: "none", border: "none", color: "#94A3B8", fontSize: "18px", cursor: "pointer" }}>✕</button>
+            </div>
+            <form onSubmit={handleBrandSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>BRAND NAME *</label>
+                <input
+                  type="text"
+                  value={brandFormData.name}
+                  onChange={(e) => setBrandFormData({ ...brandFormData, name: e.target.value, slug: generateSlug(e.target.value) })}
+                  required
+                  style={{ width: "100%", height: "40px", padding: "0 12px", borderRadius: "6px", backgroundColor: "#0D1016", border: "1px solid #2B3342", color: "#FFF" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>SLUG *</label>
+                <input
+                  type="text"
+                  value={brandFormData.slug}
+                  onChange={(e) => setBrandFormData({ ...brandFormData, slug: e.target.value })}
+                  required
+                  style={{ width: "100%", height: "40px", padding: "0 12px", borderRadius: "6px", backgroundColor: "#0D1016", border: "1px solid #2B3342", color: "#FFF", fontFamily: "monospace" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>DESCRIPTION</label>
+                <textarea
+                  rows={2}
+                  value={brandFormData.description}
+                  onChange={(e) => setBrandFormData({ ...brandFormData, description: e.target.value })}
+                  style={{ width: "100%", padding: "8px 12px", borderRadius: "6px", backgroundColor: "#0D1016", border: "1px solid #2B3342", color: "#FFF" }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                <button type="button" onClick={() => setIsBrandModalOpen(false)} style={{ flex: 1, height: "42px", borderRadius: "6px", backgroundColor: "#252B37", color: "#FFF", fontWeight: "700", border: "none" }}>Cancel</button>
+                <button type="submit" disabled={formSubmitting} style={{ flex: 2, height: "42px", borderRadius: "6px", backgroundColor: "var(--color-accent)", color: "#0B0C0E", fontWeight: "800", border: "none" }}>
+                  {formSubmitting ? "Saving..." : selectedBrand ? "Update Brand" : "Create Brand"}
                 </button>
               </div>
             </form>

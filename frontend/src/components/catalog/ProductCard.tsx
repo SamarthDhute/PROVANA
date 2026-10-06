@@ -138,11 +138,19 @@ export default function ProductCard({ product }: ProductCardProps) {
           {product.highlight}
         </div>
 
-        {/* Ratings */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "14px", fontSize: "12.5px" }}>
-          <span style={{ color: "#F59E0B" }}>★★★★★</span>
-          <span style={{ fontWeight: "700", color: "#FFF" }}>{product.rating}</span>
-          <span style={{ color: "var(--color-text-muted)" }}>({product.reviewCount})</span>
+        {/* Ratings or Quality Seal */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "14px", fontSize: "12px" }}>
+          {product.rating && product.rating > 0 ? (
+            <>
+              <span style={{ color: "#F59E0B" }}>★★★★★</span>
+              <span style={{ fontWeight: "700", color: "#FFF" }}>{product.rating}</span>
+              <span style={{ color: "var(--color-text-muted)" }}>({product.reviewCount})</span>
+            </>
+          ) : (
+            <span style={{ color: "#94A3B8", fontSize: "11.5px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+              <span style={{ color: "var(--color-accent)" }}>✓</span> Lab Tested &amp; Certified Pure
+            </span>
+          )}
         </div>
 
         {/* Price Row */}
