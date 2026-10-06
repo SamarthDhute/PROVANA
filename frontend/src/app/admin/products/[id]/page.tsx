@@ -102,7 +102,7 @@ export default function AdminProductDetailPage() {
   const isStaff = isAuthenticated && (user?.role === "ADMIN" || user?.role === "PRODUCT_MANAGER" || user?.role === "MANAGER");
 
   const loadProductData = useCallback(async () => {
-    if (!id || (!token && !isStaff)) return;
+    if (!id || !token || !isStaff) return;
     setLoading(true);
     try {
       const [prod, cats, subs, b] = await Promise.all([

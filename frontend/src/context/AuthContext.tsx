@@ -54,8 +54,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               localStorage.setItem("provana_user", JSON.stringify(currentUser));
             }
           })
-          .catch(() => {
-            // Silently retain cached session or clear if expired
+          .catch((err) => {
+            console.warn("Session expired or invalid, resetting auth state:", err);
+            setUser(null);
+            setToken(null);
+            try {
+              localStorage.removeItem("provana_auth_token");
+              localStorage.removeItem("provana_user");
+            } catch {}
           });
       }
     } catch (err) {

@@ -49,7 +49,7 @@ export default function AdminCataloguePage() {
 
   // Fetch Products & Metadata
   const fetchData = useCallback(async () => {
-    if (!token && !isStaff) return;
+    if (!token || !isStaff) return;
     setLoading(true);
     try {
       const [prodPage, cats, subs, b] = await Promise.all([
@@ -74,7 +74,11 @@ export default function AdminCataloguePage() {
       }
     } catch (err: any) {
       console.error("Error fetching admin catalog data:", err);
-      showToast(err.message || "Error loading catalog data from server");
+      if (err?.status === 401 || err?.status === 403) {
+        showToast("Session expired or unauthorized. Please re-authenticate.");
+      } else {
+        showToast(err.message || "Error loading catalog data from server");
+      }
     } finally {
       setLoading(false);
     }
