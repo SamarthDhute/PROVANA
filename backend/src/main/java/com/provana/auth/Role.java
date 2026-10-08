@@ -73,6 +73,7 @@ public enum Role {
             Permission.PRODUCT_FAQ_WRITE,
 
             // Reports & AI
+            Permission.REPORT_READ,
             Permission.REPORT_CATALOGUE_READ,
             Permission.AI_CATALOGUE_INSIGHTS,
             Permission.AI_PRODUCT_RECOMMENDATION
@@ -96,6 +97,7 @@ public enum Role {
             // Inventory operations
             Permission.INVENTORY_READ,
             Permission.INVENTORY_WRITE,
+            Permission.INVENTORY_UPDATE,
             Permission.INVENTORY_ADJUST,
             Permission.INVENTORY_TRANSFER,
             Permission.INVENTORY_REPORT_READ,
@@ -120,6 +122,7 @@ public enum Role {
             Permission.RETURN_APPROVE,
             Permission.RETURN_REJECT,
             Permission.RETURN_PROCESS,
+            Permission.RETURN_UPDATE,
 
             Permission.REFUND_READ,
             Permission.REFUND_PROCESS,
@@ -127,8 +130,10 @@ public enum Role {
             // Operational Customer Support & Reports
             Permission.CUSTOMER_READ,
             Permission.CUSTOMER_SUPPORT,
+            Permission.REPORT_READ,
             Permission.REPORT_OPERATIONAL_READ,
             Permission.REPORT_ORDER_READ,
+            Permission.ANALYTICS_READ,
             Permission.AI_ORDER_INSIGHTS
     )),
 
@@ -161,6 +166,7 @@ public enum Role {
             Permission.MEDIA_DELETE,
 
             // Content Reports & AI Generation
+            Permission.REPORT_READ,
             Permission.REPORT_CONTENT_READ,
             Permission.AI_CONTENT_GENERATE
     )),
@@ -196,12 +202,14 @@ public enum Role {
             Permission.RETURN_APPROVE,
             Permission.RETURN_REJECT,
             Permission.RETURN_PROCESS,
+            Permission.RETURN_UPDATE,
             Permission.REFUND_READ,
             Permission.REFUND_PROCESS,
 
             // Customer Support & Reports
             Permission.CUSTOMER_READ,
             Permission.CUSTOMER_SUPPORT,
+            Permission.REPORT_READ,
             Permission.REPORT_ORDER_READ,
             Permission.AI_ORDER_INSIGHTS
     )),

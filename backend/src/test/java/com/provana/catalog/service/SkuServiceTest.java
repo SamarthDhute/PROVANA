@@ -35,6 +35,9 @@ class SkuServiceTest {
     @Mock
     private ProductVariantRepository variantRepository;
 
+    @Mock
+    private com.provana.inventory.repository.InventoryRepository inventoryRepository;
+
     @InjectMocks
     private SkuService skuService;
 

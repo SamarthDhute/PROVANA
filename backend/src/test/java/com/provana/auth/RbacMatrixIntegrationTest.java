@@ -127,11 +127,15 @@ class RbacMatrixIntegrationTest {
         // Allowed operations
         assertThat(Role.MANAGER.hasPermission(Permission.INVENTORY_READ)).isTrue();
         assertThat(Role.MANAGER.hasPermission(Permission.INVENTORY_WRITE)).isTrue();
+        assertThat(Role.MANAGER.hasPermission(Permission.INVENTORY_UPDATE)).isTrue();
         assertThat(Role.MANAGER.hasPermission(Permission.INVENTORY_ADJUST)).isTrue();
         assertThat(Role.MANAGER.hasPermission(Permission.ORDER_STATUS_UPDATE)).isTrue();
         assertThat(Role.MANAGER.hasPermission(Permission.SHIPMENT_FULFILL)).isTrue();
         assertThat(Role.MANAGER.hasPermission(Permission.RETURN_PROCESS)).isTrue();
+        assertThat(Role.MANAGER.hasPermission(Permission.RETURN_UPDATE)).isTrue();
+        assertThat(Role.MANAGER.hasPermission(Permission.REPORT_READ)).isTrue();
         assertThat(Role.MANAGER.hasPermission(Permission.REPORT_OPERATIONAL_READ)).isTrue();
+        assertThat(Role.MANAGER.hasPermission(Permission.ANALYTICS_READ)).isTrue();
         assertThat(Role.MANAGER.hasPermission(Permission.CATALOGUE_READ)).isTrue();
 
         // Strictly forbidden
@@ -142,6 +146,7 @@ class RbacMatrixIntegrationTest {
         assertThat(Role.MANAGER.hasPermission(Permission.USER_CREATE)).isFalse();
         assertThat(Role.MANAGER.hasPermission(Permission.USER_DELETE)).isFalse();
         assertThat(Role.MANAGER.hasPermission(Permission.ROLE_UPDATE)).isFalse();
+        assertThat(Role.MANAGER.hasPermission(Permission.PERMISSION_MANAGE)).isFalse();
         assertThat(Role.MANAGER.hasPermission(Permission.SYSTEM_SETTINGS_UPDATE)).isFalse();
         assertThat(Role.MANAGER.hasPermission(Permission.CMS_PUBLISH)).isFalse();
 

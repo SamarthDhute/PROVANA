@@ -47,7 +47,28 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/health/**", "/actuator/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         // Public customer catalogue read endpoints
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**", "/api/v1/subcategories/**", "/api/v1/brands/**", "/api/v1/products/**").permitAll()
-                        // Protected admin endpoints require authenticated administrative role
+                        // User & RBAC Management: ADMIN only
+                        .requestMatchers("/api/v1/admin/users/**").hasRole("ADMIN")
+
+                        // Inventory Management: ADMIN, MANAGER
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/inventory/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/admin/inventory/*/adjust").hasAnyAuthority("INVENTORY_ADJUST")
+                        .requestMatchers("/api/v1/admin/inventory/**").hasAnyRole("ADMIN", "MANAGER")
+
+                        // Media Upload: ADMIN, PRODUCT_MANAGER, CONTENT_MANAGER
+                        .requestMatchers("/api/v1/admin/media/**").hasAnyRole("ADMIN", "PRODUCT_MANAGER", "CONTENT_MANAGER")
+
+                        // Catalogue Read (Categories, Subcategories, Brands, Products): ADMIN, PRODUCT_MANAGER, MANAGER, CONTENT_MANAGER, ORDER_MANAGER
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/categories/**", "/api/v1/admin/subcategories/**", "/api/v1/admin/brands/**", "/api/v1/admin/products/**")
+                        .hasAnyRole("ADMIN", "PRODUCT_MANAGER", "MANAGER", "CONTENT_MANAGER", "ORDER_MANAGER")
+
+                        // Catalogue Writes (Create, Update, Delete Products/Categories/Brands/Variants/SKUs): ADMIN, PRODUCT_MANAGER only
+                        .requestMatchers("/api/v1/admin/categories/**").hasAnyRole("ADMIN", "PRODUCT_MANAGER")
+                        .requestMatchers("/api/v1/admin/subcategories/**").hasAnyRole("ADMIN", "PRODUCT_MANAGER")
+                        .requestMatchers("/api/v1/admin/brands/**").hasAnyRole("ADMIN", "PRODUCT_MANAGER")
+                        .requestMatchers("/api/v1/admin/products/**").hasAnyRole("ADMIN", "PRODUCT_MANAGER")
+
+                        // All other /admin/** endpoints require administrative role (no CUSTOMER access)
                         .requestMatchers("/api/v1/admin/**").hasAnyRole("ADMIN", "PRODUCT_MANAGER", "MANAGER", "CONTENT_MANAGER", "ORDER_MANAGER")
                         .anyRequest().authenticated()
                 )

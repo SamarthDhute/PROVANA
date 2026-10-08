@@ -70,6 +70,7 @@ public enum Permission {
     // ==========================================
     INVENTORY_READ,
     INVENTORY_WRITE,
+    INVENTORY_UPDATE,
     INVENTORY_ADJUST,
     INVENTORY_TRANSFER,
     INVENTORY_REPORT_READ,
@@ -100,6 +101,7 @@ public enum Permission {
     RETURN_APPROVE,
     RETURN_REJECT,
     RETURN_PROCESS,
+    RETURN_UPDATE,
 
     REFUND_READ,
     REFUND_CREATE,
@@ -130,6 +132,7 @@ public enum Permission {
     PERMISSION_READ,
     PERMISSION_ASSIGN,
     PERMISSION_REVOKE,
+    PERMISSION_MANAGE,
 
     RBAC_MANAGE,
 

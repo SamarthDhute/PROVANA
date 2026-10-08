@@ -31,11 +31,10 @@ public class AdminUserController {
     }
 
     @GetMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('USER_READ')")
     @Operation(summary = "List all platform users", description = "Requires USER_READ permission (ADMIN ONLY)")
-    public ResponseEntity<ApiResponse<List<UserResponse>>> getAllUsers(
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
-
-        securityService.checkPermission(adminRole, Permission.USER_READ);
+    public ResponseEntity<ApiResponse<List<UserResponse>>> getAllUsers() {
+        securityService.checkPermission(Permission.USER_READ);
         List<UserResponse> responses = userRepository.findAll().stream()
                 .map(this::mapToResponse)
                 .toList();
@@ -44,12 +43,10 @@ public class AdminUserController {
     }
 
     @GetMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('USER_READ')")
     @Operation(summary = "Get user by ID", description = "Requires USER_READ permission (ADMIN ONLY)")
-    public ResponseEntity<ApiResponse<UserResponse>> getUserById(
-            @PathVariable UUID id,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
-
-        securityService.checkPermission(adminRole, Permission.USER_READ);
+    public ResponseEntity<ApiResponse<UserResponse>> getUserById(@PathVariable UUID id) {
+        securityService.checkPermission(Permission.USER_READ);
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
@@ -57,13 +54,13 @@ public class AdminUserController {
     }
 
     @PatchMapping("/{id}/role")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('ROLE_UPDATE')")
     @Operation(summary = "Update user role", description = "Requires ROLE_UPDATE permission (ADMIN ONLY)")
     public ResponseEntity<ApiResponse<UserResponse>> updateUserRole(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateUserRoleRequest request,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
+            @Valid @RequestBody UpdateUserRoleRequest request) {
 
-        securityService.checkPermission(adminRole, Permission.ROLE_UPDATE);
+        securityService.checkPermission(Permission.ROLE_UPDATE);
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
@@ -74,12 +71,10 @@ public class AdminUserController {
     }
 
     @DeleteMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('USER_DELETE')")
     @Operation(summary = "Deactivate user", description = "Requires USER_DELETE permission (ADMIN ONLY)")
-    public ResponseEntity<ApiResponse<Void>> deactivateUser(
-            @PathVariable UUID id,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
-
-        securityService.checkPermission(adminRole, Permission.USER_DELETE);
+    public ResponseEntity<ApiResponse<Void>> deactivateUser(@PathVariable UUID id) {
+        securityService.checkPermission(Permission.USER_DELETE);
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 

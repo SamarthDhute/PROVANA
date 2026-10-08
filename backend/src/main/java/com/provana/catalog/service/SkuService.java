@@ -21,10 +21,14 @@ public class SkuService {
 
     private final SkuRepository skuRepository;
     private final ProductVariantRepository variantRepository;
+    private final com.provana.inventory.repository.InventoryRepository inventoryRepository;
 
-    public SkuService(SkuRepository skuRepository, ProductVariantRepository variantRepository) {
+    public SkuService(SkuRepository skuRepository,
+                      ProductVariantRepository variantRepository,
+                      com.provana.inventory.repository.InventoryRepository inventoryRepository) {
         this.skuRepository = skuRepository;
         this.variantRepository = variantRepository;
+        this.inventoryRepository = inventoryRepository;
     }
 
     @Transactional(readOnly = true)
@@ -76,6 +80,12 @@ public class SkuService {
         }
 
         Sku saved = skuRepository.save(sku);
+
+        if (!inventoryRepository.existsBySkuId(saved.getId())) {
+            com.provana.inventory.entity.Inventory inventory = new com.provana.inventory.entity.Inventory(saved, 100, 5);
+            inventoryRepository.save(inventory);
+        }
+
         return mapToResponse(saved);
     }
 

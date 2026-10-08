@@ -8,13 +8,13 @@ import com.provana.catalog.service.*;
 import com.provana.common.response.ApiResponse;
 import com.provana.common.response.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -53,67 +53,63 @@ public class AdminProductController {
     // ==========================================
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_READ', 'PRODUCT_READ')")
     @Operation(summary = "List all products (Admin)", description = "Includes DRAFT, PUBLISHED, and UNPUBLISHED products")
     public ResponseEntity<ApiResponse<PageResponse<ProductSummaryResponse>>> listAdminProducts(
             @RequestParam(required = false) ProductStatus status,
             @RequestParam(required = false) String search,
-            @PageableDefault(size = 20) Pageable pageable,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
+            @PageableDefault(size = 20) Pageable pageable) {
 
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_READ);
+        securityService.checkAnyPermission(Permission.CATALOGUE_READ, Permission.PRODUCT_READ);
         return ResponseEntity.ok(ApiResponse.ok(productService.listAdminProducts(status, search, pageable)));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_READ', 'PRODUCT_READ')")
     @Operation(summary = "Get product by ID (Admin)")
-    public ResponseEntity<ApiResponse<ProductDetailResponse>> getAdminProduct(
-            @PathVariable UUID id,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
-
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_READ);
+    public ResponseEntity<ApiResponse<ProductDetailResponse>> getAdminProduct(@PathVariable UUID id) {
+        securityService.checkAnyPermission(Permission.CATALOGUE_READ, Permission.PRODUCT_READ);
         return ResponseEntity.ok(ApiResponse.ok(productService.getAdminProductById(id)));
     }
 
     @PostMapping
-    @Operation(summary = "Create conceptual product", description = "Requires CATALOGUE_WRITE permission")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_WRITE', 'PRODUCT_CREATE')")
+    @Operation(summary = "Create conceptual product", description = "Requires CATALOGUE_WRITE or PRODUCT_CREATE permission")
     public ResponseEntity<ApiResponse<ProductDetailResponse>> createProduct(
-            @Valid @RequestBody CreateProductRequest request,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
+            @Valid @RequestBody CreateProductRequest request) {
 
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_WRITE);
+        securityService.checkAnyPermission(Permission.CATALOGUE_WRITE, Permission.PRODUCT_CREATE);
         ProductDetailResponse response = productService.createProduct(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(response));
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update conceptual product", description = "Requires CATALOGUE_WRITE permission")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_WRITE', 'PRODUCT_UPDATE')")
+    @Operation(summary = "Update conceptual product", description = "Requires CATALOGUE_WRITE or PRODUCT_UPDATE permission")
     public ResponseEntity<ApiResponse<ProductDetailResponse>> updateProduct(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateProductRequest request,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
+            @Valid @RequestBody UpdateProductRequest request) {
 
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_WRITE);
+        securityService.checkAnyPermission(Permission.CATALOGUE_WRITE, Permission.PRODUCT_UPDATE);
         return ResponseEntity.ok(ApiResponse.ok(productService.updateProduct(id, request)));
     }
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_WRITE', 'PRODUCT_UPDATE', 'PRODUCT_PUBLISH')")
     @Operation(summary = "Update product status", description = "Transition between DRAFT, PUBLISHED, UNPUBLISHED")
     public ResponseEntity<ApiResponse<ProductDetailResponse>> updateProductStatus(
             @PathVariable UUID id,
-            @RequestParam ProductStatus status,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
+            @RequestParam ProductStatus status) {
 
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_WRITE);
+        securityService.checkAnyPermission(Permission.CATALOGUE_WRITE, Permission.PRODUCT_UPDATE, Permission.PRODUCT_PUBLISH);
         return ResponseEntity.ok(ApiResponse.ok(productService.updateProductStatus(id, status)));
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete or unpublish product", description = "Requires CATALOGUE_DELETE permission")
-    public ResponseEntity<ApiResponse<Void>> deleteProduct(
-            @PathVariable UUID id,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
-
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_DELETE);
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_DELETE', 'PRODUCT_DELETE')")
+    @Operation(summary = "Delete or unpublish product", description = "Requires CATALOGUE_DELETE or PRODUCT_DELETE permission")
+    public ResponseEntity<ApiResponse<Void>> deleteProduct(@PathVariable UUID id) {
+        securityService.checkAnyPermission(Permission.CATALOGUE_DELETE, Permission.PRODUCT_DELETE);
         productService.deleteProduct(id);
         return ResponseEntity.ok(ApiResponse.ok(null, "Product removed or safely unpublished"));
     }
@@ -123,34 +119,32 @@ public class AdminProductController {
     // ==========================================
 
     @PostMapping("/{id}/variants")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_WRITE', 'PRODUCT_VARIANT_CREATE')")
     @Operation(summary = "Add variant to product")
     public ResponseEntity<ApiResponse<VariantResponse>> addVariant(
             @PathVariable UUID id,
-            @Valid @RequestBody VariantRequest request,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
+            @Valid @RequestBody VariantRequest request) {
 
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_WRITE);
+        securityService.checkAnyPermission(Permission.CATALOGUE_WRITE, Permission.PRODUCT_VARIANT_CREATE);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(variantService.createVariant(request)));
     }
 
     @PutMapping("/variants/{variantId}")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_WRITE', 'PRODUCT_VARIANT_UPDATE')")
     @Operation(summary = "Update variant")
     public ResponseEntity<ApiResponse<VariantResponse>> updateVariant(
             @PathVariable UUID variantId,
-            @Valid @RequestBody VariantRequest request,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
+            @Valid @RequestBody VariantRequest request) {
 
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_WRITE);
+        securityService.checkAnyPermission(Permission.CATALOGUE_WRITE, Permission.PRODUCT_VARIANT_UPDATE);
         return ResponseEntity.ok(ApiResponse.ok(variantService.updateVariant(variantId, request)));
     }
 
     @DeleteMapping("/variants/{variantId}")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_DELETE', 'PRODUCT_VARIANT_DELETE')")
     @Operation(summary = "Deactivate variant")
-    public ResponseEntity<ApiResponse<Void>> deleteVariant(
-            @PathVariable UUID variantId,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
-
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_DELETE);
+    public ResponseEntity<ApiResponse<Void>> deleteVariant(@PathVariable UUID variantId) {
+        securityService.checkAnyPermission(Permission.CATALOGUE_DELETE, Permission.PRODUCT_VARIANT_DELETE);
         variantService.deleteVariant(variantId);
         return ResponseEntity.ok(ApiResponse.ok(null, "Variant deactivated"));
     }
@@ -160,33 +154,29 @@ public class AdminProductController {
     // ==========================================
 
     @PostMapping("/skus")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_WRITE', 'SKU_CREATE')")
     @Operation(summary = "Create sellable SKU under variant")
-    public ResponseEntity<ApiResponse<SkuResponse>> createSku(
-            @Valid @RequestBody SkuRequest request,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
-
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_WRITE);
+    public ResponseEntity<ApiResponse<SkuResponse>> createSku(@Valid @RequestBody SkuRequest request) {
+        securityService.checkAnyPermission(Permission.CATALOGUE_WRITE, Permission.SKU_CREATE);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(skuService.createSku(request)));
     }
 
     @PutMapping("/skus/{skuId}")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_WRITE', 'SKU_UPDATE')")
     @Operation(summary = "Update sellable SKU")
     public ResponseEntity<ApiResponse<SkuResponse>> updateSku(
             @PathVariable UUID skuId,
-            @Valid @RequestBody SkuRequest request,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
+            @Valid @RequestBody SkuRequest request) {
 
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_WRITE);
+        securityService.checkAnyPermission(Permission.CATALOGUE_WRITE, Permission.SKU_UPDATE);
         return ResponseEntity.ok(ApiResponse.ok(skuService.updateSku(skuId, request)));
     }
 
     @DeleteMapping("/skus/{skuId}")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_DELETE', 'SKU_DELETE')")
     @Operation(summary = "Deactivate sellable SKU")
-    public ResponseEntity<ApiResponse<Void>> deleteSku(
-            @PathVariable UUID skuId,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
-
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_DELETE);
+    public ResponseEntity<ApiResponse<Void>> deleteSku(@PathVariable UUID skuId) {
+        securityService.checkAnyPermission(Permission.CATALOGUE_DELETE, Permission.SKU_DELETE);
         skuService.deleteSku(skuId);
         return ResponseEntity.ok(ApiResponse.ok(null, "SKU deactivated"));
     }
@@ -196,23 +186,21 @@ public class AdminProductController {
     // ==========================================
 
     @PostMapping("/{id}/media")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_WRITE', 'PRODUCT_MEDIA_CREATE', 'CATALOGUE_MEDIA_MANAGE')")
     @Operation(summary = "Add image/video media to product")
     public ResponseEntity<ApiResponse<ProductMediaResponse>> addMedia(
             @PathVariable UUID id,
-            @Valid @RequestBody ProductMediaRequest request,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
+            @Valid @RequestBody ProductMediaRequest request) {
 
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_WRITE);
+        securityService.checkAnyPermission(Permission.CATALOGUE_WRITE, Permission.PRODUCT_MEDIA_CREATE, Permission.CATALOGUE_MEDIA_MANAGE);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(mediaService.addMedia(request)));
     }
 
     @DeleteMapping("/media/{mediaId}")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_DELETE', 'PRODUCT_MEDIA_DELETE', 'CATALOGUE_MEDIA_MANAGE')")
     @Operation(summary = "Delete product media")
-    public ResponseEntity<ApiResponse<Void>> deleteMedia(
-            @PathVariable UUID mediaId,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
-
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_DELETE);
+    public ResponseEntity<ApiResponse<Void>> deleteMedia(@PathVariable UUID mediaId) {
+        securityService.checkAnyPermission(Permission.CATALOGUE_DELETE, Permission.PRODUCT_MEDIA_DELETE, Permission.CATALOGUE_MEDIA_MANAGE);
         mediaService.deleteMedia(mediaId);
         return ResponseEntity.ok(ApiResponse.ok(null, "Media deleted"));
     }
@@ -222,13 +210,13 @@ public class AdminProductController {
     // ==========================================
 
     @PutMapping("/{id}/nutrition")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_WRITE', 'PRODUCT_NUTRITION_WRITE')")
     @Operation(summary = "Save or update nutritional facts")
     public ResponseEntity<ApiResponse<NutritionResponse>> saveNutrition(
             @PathVariable UUID id,
-            @Valid @RequestBody NutritionRequest request,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
+            @Valid @RequestBody NutritionRequest request) {
 
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_WRITE);
+        securityService.checkAnyPermission(Permission.CATALOGUE_WRITE, Permission.PRODUCT_NUTRITION_WRITE);
         return ResponseEntity.ok(ApiResponse.ok(nutritionService.saveOrUpdateNutrition(id, request)));
     }
 
@@ -237,23 +225,21 @@ public class AdminProductController {
     // ==========================================
 
     @PostMapping("/{id}/faqs")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_WRITE', 'PRODUCT_FAQ_WRITE')")
     @Operation(summary = "Add FAQ to product")
     public ResponseEntity<ApiResponse<ProductFaqResponse>> addFaq(
             @PathVariable UUID id,
-            @Valid @RequestBody ProductFaqRequest request,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
+            @Valid @RequestBody ProductFaqRequest request) {
 
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_WRITE);
+        securityService.checkAnyPermission(Permission.CATALOGUE_WRITE, Permission.PRODUCT_FAQ_WRITE);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(faqService.addFaq(request)));
     }
 
     @DeleteMapping("/faqs/{faqId}")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_DELETE', 'PRODUCT_FAQ_WRITE')")
     @Operation(summary = "Delete FAQ")
-    public ResponseEntity<ApiResponse<Void>> deleteFaq(
-            @PathVariable UUID faqId,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
-
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_DELETE);
+    public ResponseEntity<ApiResponse<Void>> deleteFaq(@PathVariable UUID faqId) {
+        securityService.checkAnyPermission(Permission.CATALOGUE_DELETE, Permission.PRODUCT_FAQ_WRITE);
         faqService.deleteFaq(faqId);
         return ResponseEntity.ok(ApiResponse.ok(null, "FAQ deleted"));
     }

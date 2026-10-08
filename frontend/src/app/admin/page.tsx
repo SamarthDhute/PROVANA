@@ -944,6 +944,7 @@ export default function AdminCataloguePage() {
                           <td style={{ padding: "14px 18px" }}>
                             <select
                               value={p.status}
+                              disabled={!can("PRODUCT_UPDATE") && !can("PRODUCT_PUBLISH")}
                               onChange={(e) =>
                                 handleStatusChange(p.id, e.target.value as "DRAFT" | "PUBLISHED" | "UNPUBLISHED")
                               }
@@ -955,7 +956,8 @@ export default function AdminCataloguePage() {
                                 padding: "4px 8px",
                                 fontSize: "12px",
                                 fontWeight: "800",
-                                cursor: "pointer",
+                                cursor: can("PRODUCT_UPDATE") || can("PRODUCT_PUBLISH") ? "pointer" : "default",
+                                opacity: can("PRODUCT_UPDATE") || can("PRODUCT_PUBLISH") ? 1 : 0.7,
                                 outline: "none",
                               }}
                             >
@@ -988,57 +990,63 @@ export default function AdminCataloguePage() {
                               >
                                 👁️
                               </Link>
-                              <Link
-                                href={`/admin/products/${p.id}`}
-                                title="Manage Variants, SKUs, Media, Nutrition & FAQs"
-                                style={{
-                                  padding: "6px 12px",
-                                  borderRadius: "6px",
-                                  backgroundColor: "rgba(59, 130, 246, 0.15)",
-                                  border: "1px solid rgba(59, 130, 246, 0.35)",
-                                  color: "#60A5FA",
-                                  fontSize: "12px",
-                                  fontWeight: "700",
-                                  textDecoration: "none",
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                }}
-                              >
-                                ⚙️ Manage
-                              </Link>
-                              <button
-                                onClick={() => openEditModal(p)}
-                                title="Edit Product"
-                                style={{
-                                  padding: "6px 12px",
-                                  borderRadius: "6px",
-                                  backgroundColor: "rgba(245, 158, 11, 0.15)",
-                                  border: "1px solid rgba(245, 158, 11, 0.35)",
-                                  color: "#FBBF24",
-                                  fontSize: "12px",
-                                  fontWeight: "700",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                ✏️ Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteProduct(p.id, p.name)}
-                                title="Delete or Deactivate"
-                                style={{
-                                  padding: "6px 10px",
-                                  borderRadius: "6px",
-                                  backgroundColor: "rgba(239, 68, 68, 0.12)",
-                                  border: "1px solid rgba(239, 68, 68, 0.3)",
-                                  color: "#EF4444",
-                                  fontSize: "12px",
-                                  fontWeight: "700",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                🗑️
-                              </button>
+                              {can("PRODUCT_UPDATE") && (
+                                <Link
+                                  href={`/admin/products/${p.id}`}
+                                  title="Manage Variants, SKUs, Media, Nutrition & FAQs"
+                                  style={{
+                                    padding: "6px 12px",
+                                    borderRadius: "6px",
+                                    backgroundColor: "rgba(59, 130, 246, 0.15)",
+                                    border: "1px solid rgba(59, 130, 246, 0.35)",
+                                    color: "#60A5FA",
+                                    fontSize: "12px",
+                                    fontWeight: "700",
+                                    textDecoration: "none",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                  }}
+                                >
+                                  ⚙️ Manage
+                                </Link>
+                              )}
+                              {can("PRODUCT_UPDATE") && (
+                                <button
+                                  onClick={() => openEditModal(p)}
+                                  title="Edit Product"
+                                  style={{
+                                    padding: "6px 12px",
+                                    borderRadius: "6px",
+                                    backgroundColor: "rgba(245, 158, 11, 0.15)",
+                                    border: "1px solid rgba(245, 158, 11, 0.35)",
+                                    color: "#FBBF24",
+                                    fontSize: "12px",
+                                    fontWeight: "700",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  ✏️ Edit
+                                </button>
+                              )}
+                              {can("PRODUCT_DELETE") && (
+                                <button
+                                  onClick={() => handleDeleteProduct(p.id, p.name)}
+                                  title="Delete or Deactivate"
+                                  style={{
+                                    padding: "6px 10px",
+                                    borderRadius: "6px",
+                                    backgroundColor: "rgba(239, 68, 68, 0.12)",
+                                    border: "1px solid rgba(239, 68, 68, 0.3)",
+                                    color: "#EF4444",
+                                    fontSize: "12px",
+                                    fontWeight: "700",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  🗑️
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1095,36 +1103,40 @@ export default function AdminCataloguePage() {
                     </td>
                     <td style={{ padding: "14px 18px", textAlign: "right" }}>
                       <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                        <button
-                          onClick={() => handleOpenCategoryModal(cat)}
-                          style={{
-                            padding: "6px 12px",
-                            borderRadius: "6px",
-                            backgroundColor: "rgba(245, 158, 11, 0.15)",
-                            border: "1px solid rgba(245, 158, 11, 0.35)",
-                            color: "#FBBF24",
-                            fontSize: "12px",
-                            fontWeight: "700",
-                            cursor: "pointer",
-                          }}
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                          style={{
-                            padding: "6px 10px",
-                            borderRadius: "6px",
-                            backgroundColor: "rgba(239, 68, 68, 0.12)",
-                            border: "1px solid rgba(239, 68, 68, 0.3)",
-                            color: "#EF4444",
-                            fontSize: "12px",
-                            fontWeight: "700",
-                            cursor: "pointer",
-                          }}
-                        >
-                          🗑️
-                        </button>
+                        {can("CATEGORY_UPDATE") && (
+                          <button
+                            onClick={() => handleOpenCategoryModal(cat)}
+                            style={{
+                              padding: "6px 12px",
+                              borderRadius: "6px",
+                              backgroundColor: "rgba(245, 158, 11, 0.15)",
+                              border: "1px solid rgba(245, 158, 11, 0.35)",
+                              color: "#FBBF24",
+                              fontSize: "12px",
+                              fontWeight: "700",
+                              cursor: "pointer",
+                            }}
+                          >
+                            ✏️ Edit
+                          </button>
+                        )}
+                        {can("CATEGORY_DELETE") && (
+                          <button
+                            onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: "6px",
+                              backgroundColor: "rgba(239, 68, 68, 0.12)",
+                              border: "1px solid rgba(239, 68, 68, 0.3)",
+                              color: "#EF4444",
+                              fontSize: "12px",
+                              fontWeight: "700",
+                              cursor: "pointer",
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1178,36 +1190,40 @@ export default function AdminCataloguePage() {
                     </td>
                     <td style={{ padding: "14px 18px", textAlign: "right" }}>
                       <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                        <button
-                          onClick={() => handleOpenSubcategoryModal(sub)}
-                          style={{
-                            padding: "6px 12px",
-                            borderRadius: "6px",
-                            backgroundColor: "rgba(245, 158, 11, 0.15)",
-                            border: "1px solid rgba(245, 158, 11, 0.35)",
-                            color: "#FBBF24",
-                            fontSize: "12px",
-                            fontWeight: "700",
-                            cursor: "pointer",
-                          }}
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSubcategory(sub.id, sub.name)}
-                          style={{
-                            padding: "6px 10px",
-                            borderRadius: "6px",
-                            backgroundColor: "rgba(239, 68, 68, 0.12)",
-                            border: "1px solid rgba(239, 68, 68, 0.3)",
-                            color: "#EF4444",
-                            fontSize: "12px",
-                            fontWeight: "700",
-                            cursor: "pointer",
-                          }}
-                        >
-                          🗑️
-                        </button>
+                        {can("SUBCATEGORY_UPDATE") && (
+                          <button
+                            onClick={() => handleOpenSubcategoryModal(sub)}
+                            style={{
+                              padding: "6px 12px",
+                              borderRadius: "6px",
+                              backgroundColor: "rgba(245, 158, 11, 0.15)",
+                              border: "1px solid rgba(245, 158, 11, 0.35)",
+                              color: "#FBBF24",
+                              fontSize: "12px",
+                              fontWeight: "700",
+                              cursor: "pointer",
+                            }}
+                          >
+                            ✏️ Edit
+                          </button>
+                        )}
+                        {can("SUBCATEGORY_DELETE") && (
+                          <button
+                            onClick={() => handleDeleteSubcategory(sub.id, sub.name)}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: "6px",
+                              backgroundColor: "rgba(239, 68, 68, 0.12)",
+                              border: "1px solid rgba(239, 68, 68, 0.3)",
+                              color: "#EF4444",
+                              fontSize: "12px",
+                              fontWeight: "700",
+                              cursor: "pointer",
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1259,36 +1275,40 @@ export default function AdminCataloguePage() {
                     </td>
                     <td style={{ padding: "14px 18px", textAlign: "right" }}>
                       <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                        <button
-                          onClick={() => handleOpenBrandModal(b)}
-                          style={{
-                            padding: "6px 12px",
-                            borderRadius: "6px",
-                            backgroundColor: "rgba(245, 158, 11, 0.15)",
-                            border: "1px solid rgba(245, 158, 11, 0.35)",
-                            color: "#FBBF24",
-                            fontSize: "12px",
-                            fontWeight: "700",
-                            cursor: "pointer",
-                          }}
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteBrand(b.id, b.name)}
-                          style={{
-                            padding: "6px 10px",
-                            borderRadius: "6px",
-                            backgroundColor: "rgba(239, 68, 68, 0.12)",
-                            border: "1px solid rgba(239, 68, 68, 0.3)",
-                            color: "#EF4444",
-                            fontSize: "12px",
-                            fontWeight: "700",
-                            cursor: "pointer",
-                          }}
-                        >
-                          🗑️
-                        </button>
+                        {can("BRAND_UPDATE") && (
+                          <button
+                            onClick={() => handleOpenBrandModal(b)}
+                            style={{
+                              padding: "6px 12px",
+                              borderRadius: "6px",
+                              backgroundColor: "rgba(245, 158, 11, 0.15)",
+                              border: "1px solid rgba(245, 158, 11, 0.35)",
+                              color: "#FBBF24",
+                              fontSize: "12px",
+                              fontWeight: "700",
+                              cursor: "pointer",
+                            }}
+                          >
+                            ✏️ Edit
+                          </button>
+                        )}
+                        {can("BRAND_DELETE") && (
+                          <button
+                            onClick={() => handleDeleteBrand(b.id, b.name)}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: "6px",
+                              backgroundColor: "rgba(239, 68, 68, 0.12)",
+                              border: "1px solid rgba(239, 68, 68, 0.3)",
+                              color: "#EF4444",
+                              fontSize: "12px",
+                              fontWeight: "700",
+                              cursor: "pointer",
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -32,6 +32,7 @@ public class ProductService {
     private final ProductMediaService mediaService;
     private final ProductNutritionService nutritionService;
     private final ProductFaqService faqService;
+    private final com.provana.inventory.repository.InventoryRepository inventoryRepository;
 
     public ProductService(ProductRepository productRepository,
                           BrandRepository brandRepository,
@@ -43,7 +44,8 @@ public class ProductService {
                           ProductVariantService variantService,
                           ProductMediaService mediaService,
                           ProductNutritionService nutritionService,
-                          ProductFaqService faqService) {
+                          ProductFaqService faqService,
+                          com.provana.inventory.repository.InventoryRepository inventoryRepository) {
         this.productRepository = productRepository;
         this.brandRepository = brandRepository;
         this.categoryRepository = categoryRepository;
@@ -55,6 +57,7 @@ public class ProductService {
         this.mediaService = mediaService;
         this.nutritionService = nutritionService;
         this.faqService = faqService;
+        this.inventoryRepository = inventoryRepository;
     }
 
     // ==========================================
@@ -282,9 +285,16 @@ public class ProductService {
     public void deleteProduct(UUID id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
-        // Soft deactivation to UNPUBLISHED to maintain historical consistency
-        product.setStatus(ProductStatus.UNPUBLISHED);
-        productRepository.save(product);
+        if (product.getVariants() != null) {
+            for (ProductVariant v : product.getVariants()) {
+                if (v.getSkus() != null) {
+                    for (Sku s : v.getSkus()) {
+                        inventoryRepository.findBySkuId(s.getId()).ifPresent(inventoryRepository::delete);
+                    }
+                }
+            }
+        }
+        productRepository.delete(product);
     }
 
     // ==========================================

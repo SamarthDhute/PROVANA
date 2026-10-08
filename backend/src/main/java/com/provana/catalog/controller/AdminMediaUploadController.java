@@ -27,18 +27,16 @@ public class AdminMediaUploadController {
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyAuthority('CATALOGUE_WRITE', 'PRODUCT_MEDIA_CREATE', 'MEDIA_UPLOAD')")
     @Operation(summary = "Upload image or video asset to Supabase", description = "Uploads file to Supabase bucket and returns public CDN URL")
     public ResponseEntity<ApiResponse<FileUploadResponse>> uploadMedia(
             @Parameter(description = "Asset file (image/png, image/jpeg, image/webp, video/mp4)")
             @RequestParam("file") MultipartFile file,
 
             @Parameter(description = "Storage directory folder (e.g. products, categories, brands)", example = "products")
-            @RequestParam(value = "folder", defaultValue = "products") String folder,
+            @RequestParam(value = "folder", defaultValue = "products") String folder) {
 
-            @Parameter(description = "Admin role credential", example = "ADMIN")
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
-
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_WRITE);
+        securityService.checkAnyPermission(Permission.CATALOGUE_WRITE, Permission.PRODUCT_MEDIA_CREATE, Permission.MEDIA_UPLOAD);
         FileUploadResponse response = storageService.uploadFile(file, folder);
         return ResponseEntity.ok(ApiResponse.ok(response, "Asset uploaded successfully to Supabase Storage"));
     }

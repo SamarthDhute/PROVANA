@@ -189,7 +189,7 @@ class CatalogueSecurityAndControllerIntegrationTest {
                         .content(newProductJson))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message", containsString("lacks required permission 'CATALOGUE_WRITE'")));
+                .andExpect(jsonPath("$.message", containsString("Access denied")));
     }
 
     @Test

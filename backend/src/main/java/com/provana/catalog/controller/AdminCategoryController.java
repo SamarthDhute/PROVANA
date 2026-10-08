@@ -7,11 +7,11 @@ import com.provana.catalog.dto.CategoryResponse;
 import com.provana.catalog.service.CategoryService;
 import com.provana.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,54 +31,48 @@ public class AdminCategoryController {
     }
 
     @GetMapping
-    @Operation(summary = "List all categories (Admin)", description = "Requires CATALOGUE_READ permission")
-    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAllCategories(
-            @Parameter(description = "Admin user role", example = "ADMIN")
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
-
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_READ);
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_READ', 'CATEGORY_READ')")
+    @Operation(summary = "List all categories (Admin)", description = "Requires CATALOGUE_READ or CATEGORY_READ permission")
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> getAllCategories() {
+        securityService.checkAnyPermission(Permission.CATALOGUE_READ, Permission.CATEGORY_READ);
         return ResponseEntity.ok(ApiResponse.ok(categoryService.getAllCategories()));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get category by ID (Admin)", description = "Requires CATALOGUE_READ permission")
-    public ResponseEntity<ApiResponse<CategoryResponse>> getCategoryById(
-            @PathVariable UUID id,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
-
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_READ);
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_READ', 'CATEGORY_READ')")
+    @Operation(summary = "Get category by ID (Admin)", description = "Requires CATALOGUE_READ or CATEGORY_READ permission")
+    public ResponseEntity<ApiResponse<CategoryResponse>> getCategoryById(@PathVariable UUID id) {
+        securityService.checkAnyPermission(Permission.CATALOGUE_READ, Permission.CATEGORY_READ);
         return ResponseEntity.ok(ApiResponse.ok(categoryService.getCategoryById(id)));
     }
 
     @PostMapping
-    @Operation(summary = "Create category", description = "Requires CATALOGUE_WRITE permission")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_WRITE', 'CATEGORY_CREATE')")
+    @Operation(summary = "Create category", description = "Requires CATALOGUE_WRITE or CATEGORY_CREATE permission")
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
-            @Valid @RequestBody CategoryRequest request,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
+            @Valid @RequestBody CategoryRequest request) {
 
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_WRITE);
+        securityService.checkAnyPermission(Permission.CATALOGUE_WRITE, Permission.CATEGORY_CREATE);
         CategoryResponse response = categoryService.createCategory(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(response));
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update category", description = "Requires CATALOGUE_WRITE permission")
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_WRITE', 'CATEGORY_UPDATE')")
+    @Operation(summary = "Update category", description = "Requires CATALOGUE_WRITE or CATEGORY_UPDATE permission")
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
             @PathVariable UUID id,
-            @Valid @RequestBody CategoryRequest request,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
+            @Valid @RequestBody CategoryRequest request) {
 
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_WRITE);
+        securityService.checkAnyPermission(Permission.CATALOGUE_WRITE, Permission.CATEGORY_UPDATE);
         return ResponseEntity.ok(ApiResponse.ok(categoryService.updateCategory(id, request)));
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete or deactivate category", description = "Requires CATALOGUE_DELETE permission")
-    public ResponseEntity<ApiResponse<Void>> deleteCategory(
-            @PathVariable UUID id,
-            @RequestHeader(value = "X-Admin-Role", required = false) String adminRole) {
-
-        securityService.checkPermission(adminRole, Permission.CATALOGUE_DELETE);
+    @PreAuthorize("hasAnyAuthority('CATALOGUE_DELETE', 'CATEGORY_DELETE')")
+    @Operation(summary = "Delete or deactivate category", description = "Requires CATALOGUE_DELETE or CATEGORY_DELETE permission")
+    public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable UUID id) {
+        securityService.checkAnyPermission(Permission.CATALOGUE_DELETE, Permission.CATEGORY_DELETE);
         categoryService.deleteCategory(id);
         return ResponseEntity.ok(ApiResponse.ok(null, "Category removed or safely deactivated"));
     }
