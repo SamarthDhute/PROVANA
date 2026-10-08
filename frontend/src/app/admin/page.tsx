@@ -8,22 +8,37 @@ import { useStore } from "@/context/StoreContext";
 import { adminProductApi } from "@/lib/api/adminProductApi";
 import { categoryApi, Category, Subcategory, Brand } from "@/lib/api/categoryApi";
 import { ProductSummary } from "@/lib/api/productApi";
+import { inventoryApi, InventoryItem, InventoryMovement } from "@/lib/api/inventoryApi";
 
 export default function AdminCataloguePage() {
   const { user, token, isAuthenticated, openAuthModal, quickLogin, can } = useAuth();
   const { showToast } = useStore();
 
   // Top-level Navigation Tab
-  const [activeMainTab, setActiveMainTab] = useState<"PRODUCTS" | "CATEGORIES" | "SUBCATEGORIES" | "BRANDS">("PRODUCTS");
+  const [activeMainTab, setActiveMainTab] = useState<"PRODUCTS" | "CATEGORIES" | "SUBCATEGORIES" | "BRANDS" | "INVENTORY">("PRODUCTS");
 
   // Data States
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "PUBLISHED" | "DRAFT" | "UNPUBLISHED">("ALL");
+  const [inventoryFilter, setInventoryFilter] = useState<"ALL" | "LOW_STOCK" | "OUT_OF_STOCK">("ALL");
+
+  // Inventory Modals
+  const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+  const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryItem | null>(null);
+  const [adjustQuantity, setAdjustQuantity] = useState<number>(10);
+  const [adjustType, setAdjustType] = useState<"INCREASE" | "DECREASE">("INCREASE");
+  const [adjustReason, setAdjustReason] = useState<string>("New shipment / Restock received");
+
+  const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
+  const [movementsList, setMovementsList] = useState<InventoryMovement[]>([]);
+  const [movementsLoading, setMovementsLoading] = useState(false);
 
   // Product Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -98,15 +113,19 @@ export default function AdminCataloguePage() {
     if (!token || !isStaff) return;
     setLoading(true);
     try {
-      const [prodPage, cats, subs, b] = await Promise.all([
+      const [prodPage, cats, subs, b, inv] = await Promise.all([
         adminProductApi.listAdminProducts({ size: 50 }),
         categoryApi.adminListCategories().catch(() => categoryApi.listCategories()),
         categoryApi.adminListSubcategories().catch(() => categoryApi.listSubcategories()),
         categoryApi.adminListBrands().catch(() => categoryApi.listBrands()),
+        inventoryApi.getInventoryList({ size: 50 }).catch(() => null),
       ]);
 
       setProducts(prodPage?.content || []);
       setCategories(cats || []);
+      if (inv?.content) {
+        setInventoryItems(inv.content);
+      }
       if (cats && cats.length > 0 && !formData.categoryId) {
         setFormData((prev) => ({ ...prev, categoryId: cats[0].id }));
       }
@@ -130,9 +149,75 @@ export default function AdminCataloguePage() {
     }
   }, [token, isStaff, showToast, formData.categoryId, formData.subcategoryId, formData.brandId]);
 
+  const fetchInventory = useCallback(async () => {
+    if (!token || !can("INVENTORY_READ")) return;
+    setInventoryLoading(true);
+    try {
+      const res = await inventoryApi.getInventoryList({
+        lowStockOnly: inventoryFilter === "LOW_STOCK" ? true : undefined,
+        size: 50,
+      });
+      setInventoryItems(res?.content || []);
+    } catch (err: any) {
+      console.error("Error fetching inventory:", err);
+    } finally {
+      setInventoryLoading(false);
+    }
+  }, [token, can, inventoryFilter]);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (activeMainTab === "INVENTORY") {
+      fetchInventory();
+    }
+  }, [activeMainTab, fetchInventory]);
+
+  // Inventory Adjustment Action
+  const handleOpenAdjustModal = (item: InventoryItem) => {
+    setSelectedInventoryItem(item);
+    setAdjustQuantity(10);
+    setAdjustType("INCREASE");
+    setAdjustReason("New shipment / Restock received");
+    setIsAdjustModalOpen(true);
+  };
+
+  const handleAdjustSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInventoryItem) return;
+    setFormSubmitting(true);
+    try {
+      const finalQty = adjustType === "INCREASE" ? Math.abs(adjustQuantity) : -Math.abs(adjustQuantity);
+      await inventoryApi.adjustStock(selectedInventoryItem.skuId, {
+        adjustmentQuantity: finalQty,
+        reason: adjustReason.trim(),
+      });
+      showToast(`Stock updated for SKU ${selectedInventoryItem.skuCode}!`);
+      setIsAdjustModalOpen(false);
+      fetchInventory();
+    } catch (err: any) {
+      showToast(err.message || "Failed to adjust stock");
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
+
+  // Inventory Movements Action
+  const handleOpenMovementsModal = async (item: InventoryItem) => {
+    setSelectedInventoryItem(item);
+    setIsMovementModalOpen(true);
+    setMovementsLoading(true);
+    try {
+      const res = await inventoryApi.getMovementHistory(item.skuId, { size: 30 });
+      setMovementsList(res?.content || []);
+    } catch (err: any) {
+      showToast(err.message || "Failed to load stock movements");
+    } finally {
+      setMovementsLoading(false);
+    }
+  };
 
   // Product Status Change
   const handleStatusChange = async (productId: string, newStatus: "DRAFT" | "PUBLISHED" | "UNPUBLISHED") => {
@@ -526,7 +611,7 @@ export default function AdminCataloguePage() {
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
               <span style={{ fontSize: "24px" }}>👑</span>
               <h1 className="font-display" style={{ fontSize: "32px", letterSpacing: "1.5px", margin: 0 }}>
-                ENTERPRISE CATALOGUE MANAGEMENT
+                ENTERPRISE CATALOGUE &amp; INVENTORY MANAGEMENT
               </h1>
               <span
                 style={{
@@ -539,11 +624,11 @@ export default function AdminCataloguePage() {
                   borderRadius: "6px",
                 }}
               >
-                PHASE 2 ACTIVE
+                PHASE 3 ACTIVE
               </span>
             </div>
             <p style={{ fontSize: "13.5px", color: "#94A3B8", margin: 0 }}>
-              Authenticated as <strong>{user?.firstName} {user?.lastName}</strong> ({user?.role}) • Full Categories, Brands, Products, Variants, SKUs, Media &amp; Pricing
+              Authenticated as <strong>{user?.firstName} {user?.lastName}</strong> ({user?.role}) • Full Categories, Brands, Products, Variants, SKUs, Media, Pricing &amp; Real-Time Inventory Control
             </p>
           </div>
 
@@ -668,7 +753,7 @@ export default function AdminCataloguePage() {
       {/* Main Content Area */}
       <div className="site-container" style={{ marginTop: "28px" }}>
         {/* Metric Cards Row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px", marginBottom: "24px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px", marginBottom: "24px" }}>
           <div
             onClick={() => setActiveMainTab("PRODUCTS")}
             style={{
@@ -721,6 +806,23 @@ export default function AdminCataloguePage() {
             <div style={{ fontSize: "12px", color: "#38BDF8", fontWeight: "700", marginBottom: "4px" }}>🏢 BRANDS</div>
             <div style={{ fontSize: "28px", fontWeight: "800", color: "#38BDF8" }}>{brands.length}</div>
           </div>
+          {can("INVENTORY_READ") && (
+            <div
+              onClick={() => setActiveMainTab("INVENTORY")}
+              style={{
+                backgroundColor: "#141824",
+                border: activeMainTab === "INVENTORY" ? "1.5px solid var(--color-accent)" : "1px solid rgba(255, 255, 255, 0.08)",
+                borderRadius: "10px",
+                padding: "16px",
+                cursor: "pointer",
+              }}
+            >
+              <div style={{ fontSize: "12px", color: "#EC4899", fontWeight: "700", marginBottom: "4px" }}>📊 LIVE INVENTORY</div>
+              <div style={{ fontSize: "28px", fontWeight: "800", color: "#EC4899" }}>
+                {inventoryItems.length} <span style={{ fontSize: "14px", fontWeight: "500", color: "#94A3B8" }}>SKUs</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Top-Level Section Navigation Bar */}
@@ -739,8 +841,8 @@ export default function AdminCataloguePage() {
           }}
         >
           {/* Main Tabs */}
-          <div style={{ display: "flex", gap: "8px" }}>
-            {(["PRODUCTS", "CATEGORIES", "SUBCATEGORIES", "BRANDS"] as const).map((tab) => (
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {(["PRODUCTS", "CATEGORIES", "SUBCATEGORIES", "BRANDS", ...(can("INVENTORY_READ") ? ["INVENTORY" as const] : [])] as Array<"PRODUCTS" | "CATEGORIES" | "SUBCATEGORIES" | "BRANDS" | "INVENTORY">).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveMainTab(tab)}
@@ -756,7 +858,15 @@ export default function AdminCataloguePage() {
                   transition: "all 0.15s ease",
                 }}
               >
-                {tab === "PRODUCTS" ? "📦 Products" : tab === "CATEGORIES" ? "🏷️ Categories" : tab === "SUBCATEGORIES" ? "📑 Subcategories" : "🏢 Brands"}
+                {tab === "PRODUCTS"
+                  ? "📦 Products"
+                  : tab === "CATEGORIES"
+                  ? "🏷️ Categories"
+                  : tab === "SUBCATEGORIES"
+                  ? "📑 Subcategories"
+                  : tab === "BRANDS"
+                  ? "🏢 Brands"
+                  : "📊 Inventory"}
               </button>
             ))}
           </div>
@@ -785,6 +895,30 @@ export default function AdminCataloguePage() {
                 ))}
               </div>
             )}
+
+            {activeMainTab === "INVENTORY" && (
+              <div style={{ display: "flex", gap: "6px" }}>
+                {(["ALL", "LOW_STOCK", "OUT_OF_STOCK"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setInventoryFilter(tab)}
+                    style={{
+                      padding: "6px 10px",
+                      borderRadius: "6px",
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      backgroundColor: inventoryFilter === tab ? "rgba(236, 72, 153, 0.2)" : "transparent",
+                      color: inventoryFilter === tab ? "#F472B6" : "#64748B",
+                      border: inventoryFilter === tab ? "1px solid #EC4899" : "1px solid transparent",
+                    }}
+                  >
+                    {tab === "ALL" ? "All SKUs" : tab === "LOW_STOCK" ? "⚠️ Low Stock" : "🚫 Out of Stock"}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div
               style={{
                 display: "flex",
@@ -814,7 +948,10 @@ export default function AdminCataloguePage() {
               />
             </div>
             <button
-              onClick={fetchData}
+              onClick={() => {
+                fetchData();
+                if (activeMainTab === "INVENTORY") fetchInventory();
+              }}
               title="Refresh Data from Server"
               style={{
                 height: "38px",
@@ -1315,6 +1452,175 @@ export default function AdminCataloguePage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* ============================================================= */}
+        {/* TAB 5: INVENTORY TABLE                                        */}
+        {/* ============================================================= */}
+        {activeMainTab === "INVENTORY" && (
+          <div
+            style={{
+              backgroundColor: "#141824",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              borderRadius: "12px",
+              overflow: "hidden",
+            }}
+          >
+            {inventoryLoading ? (
+              <div style={{ padding: "60px", textAlign: "center", color: "#94A3B8" }}>
+                <div style={{ fontSize: "28px", marginBottom: "12px" }}>⏳</div>
+                <div>Fetching live inventory states &amp; movements...</div>
+              </div>
+            ) : inventoryItems.length === 0 ? (
+              <div style={{ padding: "60px", textAlign: "center", color: "#94A3B8" }}>
+                <div style={{ fontSize: "36px", marginBottom: "12px" }}>📊</div>
+                <div style={{ fontSize: "16px", fontWeight: "700", color: "#FFF", marginBottom: "6px" }}>
+                  No SKUs Found in Inventory
+                </div>
+                <div style={{ fontSize: "13px" }}>Create products with variants &amp; SKUs to begin tracking live stock.</div>
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
+                  <thead>
+                    <tr style={{ backgroundColor: "#0F131D", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", color: "#94A3B8", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      <th style={{ padding: "14px 18px" }}>SKU CODE &amp; BARCODE</th>
+                      <th style={{ padding: "14px 18px" }}>PRODUCT &amp; VARIANT</th>
+                      <th style={{ padding: "14px 18px" }}>AVAILABLE</th>
+                      <th style={{ padding: "14px 18px" }}>RESERVED</th>
+                      <th style={{ padding: "14px 18px" }}>SELLABLE</th>
+                      <th style={{ padding: "14px 18px" }}>THRESHOLD</th>
+                      <th style={{ padding: "14px 18px" }}>STATUS</th>
+                      <th style={{ padding: "14px 18px", textAlign: "right" }}>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inventoryItems
+                      .filter((item) => {
+                        const matchesSearch =
+                          !searchQuery ||
+                          item.skuCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          item.productName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          item.variantName?.toLowerCase().includes(searchQuery.toLowerCase());
+                        const matchesFilter =
+                          inventoryFilter === "ALL" ||
+                          (inventoryFilter === "LOW_STOCK" && (item.isLowStock || item.availableQuantity <= item.lowStockThreshold)) ||
+                          (inventoryFilter === "OUT_OF_STOCK" && (item.isOutOfStock || item.availableQuantity <= 0));
+                        return matchesSearch && matchesFilter;
+                      })
+                      .map((item) => {
+                        const isOutOfStock = item.isOutOfStock || item.availableQuantity <= 0;
+                        const isLowStock = !isOutOfStock && (item.isLowStock || item.availableQuantity <= item.lowStockThreshold);
+                        const statusBadgeBg = isOutOfStock
+                          ? "rgba(239, 68, 68, 0.15)"
+                          : isLowStock
+                          ? "rgba(245, 158, 11, 0.15)"
+                          : "rgba(16, 185, 129, 0.15)";
+                        const statusBadgeColor = isOutOfStock ? "#EF4444" : isLowStock ? "#FBBF24" : "#10B981";
+                        const statusText = isOutOfStock ? "OUT OF STOCK" : isLowStock ? "LOW STOCK" : "IN STOCK";
+
+                        return (
+                          <tr
+                            key={item.id}
+                            style={{
+                              borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
+                              transition: "background 0.15s ease",
+                            }}
+                          >
+                            <td style={{ padding: "14px 18px" }}>
+                              <div style={{ fontFamily: "monospace", fontWeight: "800", color: "var(--color-accent)", fontSize: "13px" }}>
+                                {item.skuCode}
+                              </div>
+                            </td>
+                            <td style={{ padding: "14px 18px" }}>
+                              <div style={{ color: "#FFF", fontWeight: "700" }}>{item.productName || "Product SKU"}</div>
+                              <div style={{ fontSize: "12px", color: "#94A3B8" }}>
+                                {item.variantName || "Standard Variant"}
+                              </div>
+                            </td>
+                            <td style={{ padding: "14px 18px" }}>
+                              <div style={{ fontWeight: "800", fontSize: "15px", color: isOutOfStock ? "#EF4444" : "#FFF" }}>
+                                {item.availableQuantity}
+                              </div>
+                            </td>
+                            <td style={{ padding: "14px 18px" }}>
+                              <div style={{ fontWeight: "600", color: "#94A3B8" }}>{item.reservedQuantity}</div>
+                            </td>
+                            <td style={{ padding: "14px 18px" }}>
+                              <div style={{ fontWeight: "800", color: "#38BDF8" }}>
+                                {item.sellableQuantity !== undefined ? item.sellableQuantity : Math.max(0, item.availableQuantity - item.reservedQuantity)}
+                              </div>
+                            </td>
+                            <td style={{ padding: "14px 18px" }}>
+                              <div style={{ color: "#CBD5E1", fontSize: "12.5px" }}>{item.lowStockThreshold} units</div>
+                            </td>
+                            <td style={{ padding: "14px 18px" }}>
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: "800",
+                                  padding: "3px 8px",
+                                  borderRadius: "4px",
+                                  backgroundColor: statusBadgeBg,
+                                  color: statusBadgeColor,
+                                  border: `1px solid ${statusBadgeColor}44`,
+                                }}
+                              >
+                                {statusText}
+                              </span>
+                            </td>
+                            <td style={{ padding: "14px 18px", textAlign: "right" }}>
+                              <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                                {(can("INVENTORY_ADJUST") || can("INVENTORY_UPDATE")) && (
+                                  <button
+                                    onClick={() => handleOpenAdjustModal(item)}
+                                    title="Adjust Stock Quantity"
+                                    style={{
+                                      padding: "6px 12px",
+                                      borderRadius: "6px",
+                                      backgroundColor: "rgba(236, 72, 153, 0.15)",
+                                      border: "1px solid rgba(236, 72, 153, 0.35)",
+                                      color: "#F472B6",
+                                      fontSize: "12px",
+                                      fontWeight: "700",
+                                      cursor: "pointer",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "4px",
+                                    }}
+                                  >
+                                    ⚡ Adjust
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleOpenMovementsModal(item)}
+                                  title="View Movement Audit History"
+                                  style={{
+                                    padding: "6px 12px",
+                                    borderRadius: "6px",
+                                    backgroundColor: "rgba(255, 255, 255, 0.08)",
+                                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                                    color: "#CBD5E1",
+                                    fontSize: "12px",
+                                    fontWeight: "700",
+                                    cursor: "pointer",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                  }}
+                                >
+                                  📜 History
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1973,6 +2279,371 @@ export default function AdminCataloguePage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* INVENTORY STOCK ADJUSTMENT MODAL                                  */}
+      {/* ================================================================= */}
+      {isAdjustModalOpen && selectedInventoryItem && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.85)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            zIndex: 100000,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsAdjustModalOpen(false);
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#141824",
+              border: "1.5px solid rgba(236, 72, 153, 0.35)",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "520px",
+              padding: "28px",
+              color: "#FFF",
+              boxShadow: "0 20px 50px rgba(0,0,0,0.8)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "22px" }}>⚡</span>
+                <h3 className="font-display" style={{ fontSize: "20px", margin: 0, letterSpacing: "0.5px" }}>
+                  ADJUST STOCK LEVEL
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsAdjustModalOpen(false)}
+                style={{ background: "none", border: "none", color: "#94A3B8", fontSize: "18px", cursor: "pointer" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ backgroundColor: "#0D1016", border: "1px solid #2B3342", borderRadius: "8px", padding: "14px", marginBottom: "18px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                <span style={{ fontSize: "12px", color: "#94A3B8" }}>SKU Code:</span>
+                <span style={{ fontFamily: "monospace", fontWeight: "800", color: "var(--color-accent)", fontSize: "13px" }}>
+                  {selectedInventoryItem.skuCode}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                <span style={{ fontSize: "12px", color: "#94A3B8" }}>Product / Variant:</span>
+                <span style={{ fontSize: "12.5px", color: "#FFF", fontWeight: "600" }}>
+                  {selectedInventoryItem.productName || "Product"} ({selectedInventoryItem.variantName || "Standard"})
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontSize: "12px", color: "#94A3B8" }}>Current Available Stock:</span>
+                <span style={{ fontSize: "14px", fontWeight: "800", color: selectedInventoryItem.availableQuantity > 0 ? "#10B981" : "#EF4444" }}>
+                  {selectedInventoryItem.availableQuantity} units
+                </span>
+              </div>
+            </div>
+
+            <form onSubmit={handleAdjustSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", fontWeight: "700", color: "#CBD5E1", marginBottom: "6px" }}>
+                  ADJUSTMENT DIRECTION *
+                </label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdjustType("INCREASE");
+                      setAdjustReason("New shipment / Restock received");
+                    }}
+                    style={{
+                      height: "40px",
+                      borderRadius: "6px",
+                      fontWeight: "800",
+                      fontSize: "12.5px",
+                      cursor: "pointer",
+                      backgroundColor: adjustType === "INCREASE" ? "rgba(16, 185, 129, 0.2)" : "rgba(255, 255, 255, 0.05)",
+                      border: adjustType === "INCREASE" ? "1.5px solid #10B981" : "1px solid rgba(255, 255, 255, 0.1)",
+                      color: adjustType === "INCREASE" ? "#10B981" : "#94A3B8",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <span>➕ Increase Stock</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdjustType("DECREASE");
+                      setAdjustReason("Inventory audit / Damaged item removal");
+                    }}
+                    style={{
+                      height: "40px",
+                      borderRadius: "6px",
+                      fontWeight: "800",
+                      fontSize: "12.5px",
+                      cursor: "pointer",
+                      backgroundColor: adjustType === "DECREASE" ? "rgba(239, 68, 68, 0.2)" : "rgba(255, 255, 255, 0.05)",
+                      border: adjustType === "DECREASE" ? "1.5px solid #EF4444" : "1px solid rgba(255, 255, 255, 0.1)",
+                      color: adjustType === "DECREASE" ? "#EF4444" : "#94A3B8",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <span>➖ Decrease Stock</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>
+                  QUANTITY ({adjustType === "INCREASE" ? "+ units" : "- units"}) *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max={adjustType === "DECREASE" ? selectedInventoryItem.availableQuantity : 100000}
+                  value={adjustQuantity}
+                  onChange={(e) => setAdjustQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  required
+                  style={{
+                    width: "100%",
+                    height: "42px",
+                    padding: "0 12px",
+                    borderRadius: "6px",
+                    backgroundColor: "#0D1016",
+                    border: "1px solid #2B3342",
+                    color: "#FFF",
+                    fontSize: "14px",
+                    fontWeight: "700",
+                  }}
+                />
+                <div style={{ fontSize: "12px", color: "#94A3B8", marginTop: "4px" }}>
+                  Projected stock:{" "}
+                  <strong style={{ color: "#FFF" }}>
+                    {adjustType === "INCREASE"
+                      ? selectedInventoryItem.availableQuantity + adjustQuantity
+                      : Math.max(0, selectedInventoryItem.availableQuantity - adjustQuantity)}{" "}
+                    units
+                  </strong>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "11.5px", fontWeight: "700", color: "#CBD5E1", marginBottom: "4px" }}>
+                  REASON / AUDIT NOTE *
+                </label>
+                <input
+                  type="text"
+                  value={adjustReason}
+                  onChange={(e) => setAdjustReason(e.target.value)}
+                  placeholder="e.g. Warehouse receipt #PO-9481, physical count correction"
+                  required
+                  style={{
+                    width: "100%",
+                    height: "42px",
+                    padding: "0 12px",
+                    borderRadius: "6px",
+                    backgroundColor: "#0D1016",
+                    border: "1px solid #2B3342",
+                    color: "#FFF",
+                    fontSize: "13px",
+                  }}
+                />
+              </div>
+
+              {adjustType === "DECREASE" && (
+                <div
+                  style={{
+                    backgroundColor: "rgba(239, 68, 68, 0.12)",
+                    border: "1px solid rgba(239, 68, 68, 0.3)",
+                    borderRadius: "6px",
+                    padding: "10px 14px",
+                    fontSize: "12px",
+                    color: "#FCA5A5",
+                    lineHeight: "1.5",
+                  }}
+                >
+                  ⚠️ <strong>Warning:</strong> Decreasing stock creates an immutable audit record and immediately impacts customer checkout availability.
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                <button
+                  type="button"
+                  onClick={() => setIsAdjustModalOpen(false)}
+                  style={{ flex: 1, height: "42px", borderRadius: "6px", backgroundColor: "#252B37", color: "#FFF", fontWeight: "700", border: "none", cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={formSubmitting}
+                  style={{
+                    flex: 2,
+                    height: "42px",
+                    borderRadius: "6px",
+                    backgroundColor: adjustType === "INCREASE" ? "#10B981" : "#EF4444",
+                    color: "#FFF",
+                    fontWeight: "800",
+                    border: "none",
+                    cursor: "pointer",
+                    boxShadow: "0 4px 14px rgba(0,0,0,0.4)",
+                  }}
+                >
+                  {formSubmitting ? "Updating Stock..." : adjustType === "INCREASE" ? "Confirm Stock Increase" : "Confirm Stock Decrease"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* INVENTORY MOVEMENTS AUDIT HISTORY MODAL                           */}
+      {/* ================================================================= */}
+      {isMovementModalOpen && selectedInventoryItem && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.85)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            zIndex: 100000,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsMovementModalOpen(false);
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#141824",
+              border: "1.5px solid rgba(255, 255, 255, 0.15)",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "760px",
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
+              padding: "24px",
+              color: "#FFF",
+              boxShadow: "0 20px 50px rgba(0,0,0,0.8)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "22px" }}>📜</span>
+                  <h3 className="font-display" style={{ fontSize: "20px", margin: 0 }}>
+                    STOCK MOVEMENT AUDIT TRAIL
+                  </h3>
+                </div>
+                <div style={{ fontSize: "12.5px", color: "#94A3B8", marginTop: "4px" }}>
+                  SKU: <strong style={{ color: "var(--color-accent)", fontFamily: "monospace" }}>{selectedInventoryItem.skuCode}</strong> • {selectedInventoryItem.productName || "Product"}
+                </div>
+              </div>
+              <button
+                onClick={() => setIsMovementModalOpen(false)}
+                style={{ background: "none", border: "none", color: "#94A3B8", fontSize: "18px", cursor: "pointer" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "8px" }}>
+              {movementsLoading ? (
+                <div style={{ padding: "40px", textAlign: "center", color: "#94A3B8" }}>
+                  <div style={{ fontSize: "24px", marginBottom: "8px" }}>⏳</div>
+                  <div>Loading stock history...</div>
+                </div>
+              ) : movementsList.length === 0 ? (
+                <div style={{ padding: "40px", textAlign: "center", color: "#94A3B8" }}>
+                  <div style={{ fontSize: "28px", marginBottom: "8px" }}>📭</div>
+                  <div>No movements recorded yet for this SKU.</div>
+                </div>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px" }}>
+                  <thead>
+                    <tr style={{ backgroundColor: "#0D1016", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", color: "#94A3B8", fontSize: "11px", textTransform: "uppercase" }}>
+                      <th style={{ padding: "10px 14px", textAlign: "left" }}>DATE / TIME</th>
+                      <th style={{ padding: "10px 14px", textAlign: "left" }}>TYPE</th>
+                      <th style={{ padding: "10px 14px", textAlign: "center" }}>QTY</th>
+                      <th style={{ padding: "10px 14px", textAlign: "center" }}>BEFORE → AFTER</th>
+                      <th style={{ padding: "10px 14px", textAlign: "left" }}>REASON / USER</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {movementsList.map((m) => {
+                      const isPositive = m.quantity > 0 || m.movementType.includes("INCREASE") || m.movementType.includes("IN");
+                      return (
+                        <tr key={m.id} style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.04)" }}>
+                          <td style={{ padding: "10px 14px", color: "#94A3B8", fontSize: "11.5px" }}>
+                            {m.createdAt ? new Date(m.createdAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : "—"}
+                          </td>
+                          <td style={{ padding: "10px 14px" }}>
+                            <span
+                              style={{
+                                fontSize: "10.5px",
+                                fontWeight: "800",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                backgroundColor: isPositive ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                                color: isPositive ? "#10B981" : "#EF4444",
+                              }}
+                            >
+                              {m.movementType}
+                            </span>
+                          </td>
+                          <td style={{ padding: "10px 14px", textAlign: "center", fontWeight: "800", color: isPositive ? "#10B981" : "#EF4444" }}>
+                            {isPositive ? `+${m.quantity}` : m.quantity}
+                          </td>
+                          <td style={{ padding: "10px 14px", textAlign: "center", fontFamily: "monospace", color: "#CBD5E1" }}>
+                            {m.previousQuantity} → <strong style={{ color: "#FFF" }}>{m.newQuantity}</strong>
+                          </td>
+                          <td style={{ padding: "10px 14px" }}>
+                            <div style={{ color: "#FFF", fontSize: "12px" }}>{m.reason || "Manual Adjustment"}</div>
+                            <div style={{ fontSize: "10.5px", color: "#64748B" }}>By: {m.performedBy || "System"}</div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div style={{ marginTop: "16px", display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setIsMovementModalOpen(false)}
+                style={{
+                  height: "38px",
+                  padding: "0 20px",
+                  borderRadius: "6px",
+                  backgroundColor: "rgba(255, 255, 255, 0.08)",
+                  color: "#FFF",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
