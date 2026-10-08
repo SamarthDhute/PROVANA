@@ -68,8 +68,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/brands/**").hasAnyRole("ADMIN", "PRODUCT_MANAGER")
                         .requestMatchers("/api/v1/admin/products/**").hasAnyRole("ADMIN", "PRODUCT_MANAGER")
 
-                        // All other /admin/** endpoints require administrative role (no CUSTOMER access)
-                        .requestMatchers("/api/v1/admin/**").hasAnyRole("ADMIN", "PRODUCT_MANAGER", "MANAGER", "CONTENT_MANAGER", "ORDER_MANAGER")
+                        // Strict Administrative Fallback: Any unclassified /admin/** endpoint defaults to ADMIN only
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex

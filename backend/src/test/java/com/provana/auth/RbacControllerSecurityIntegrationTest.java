@@ -394,6 +394,26 @@ class RbacControllerSecurityIntegrationTest {
     }
 
     @Test
+    @DisplayName("MANAGER: Cannot delete products (403 Forbidden)")
+    void manager_CannotDeleteProduct() throws Exception {
+        mockMvc.perform(delete("/api/v1/admin/products/" + UUID.randomUUID())
+                        .header("Authorization", createBearerToken(Role.MANAGER, "manager@provana.com"))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("MANAGER: Cannot delete categories (403 Forbidden)")
+    void manager_CannotDeleteCategory() throws Exception {
+        mockMvc.perform(delete("/api/v1/admin/categories/" + UUID.randomUUID())
+                        .header("Authorization", createBearerToken(Role.MANAGER, "manager@provana.com"))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     @DisplayName("Attack Vector 6: Forged X-Admin-Role: ADMIN header with MANAGER JWT on product creation returns 403 (No Privilege Escalation)")
     void attack_ForgedHeaderWithManagerJwt_Returns403() throws Exception {
         String payload = """
@@ -413,5 +433,27 @@ class RbacControllerSecurityIntegrationTest {
                         .content(payload))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("Attack Vector 7: Unclassified administrative endpoint defaults to DENY for non-ADMIN roles (403 Forbidden)")
+    void attack_UnclassifiedAdminEndpoint_DeniedForManager() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/system-settings")
+                        .header("Authorization", createBearerToken(Role.MANAGER, "manager@provana.com"))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("Customer Isolation: Customer JWT accessing /api/v1/auth/me receives strictly their own profile")
+    void customer_ProfileIsolation_ReturnsOwnData() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", createBearerToken(Role.CUSTOMER, "customer@provana.com"))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.email").value("customer@provana.com"))
+                .andExpect(jsonPath("$.data.role").value("CUSTOMER"));
     }
 }
