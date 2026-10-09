@@ -7,11 +7,17 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "provana.razorpay")
 public class RazorpayProperties {
 
-    private String keyId = "rzp_test_mockkeyid12345";
-    private String keySecret = "mocksecretkey1234567890abcdef";
-    private String webhookSecret = "mockwebhooksecret123456789";
+    private String keyId;
+    private String keySecret;
+    private String webhookSecret;
     private String currency = "INR";
     private boolean enabled = true;
+
+    public boolean isConfigured() {
+        return enabled
+                && keyId != null && !keyId.isBlank() && !keyId.toLowerCase().contains("mock")
+                && keySecret != null && !keySecret.isBlank() && !keySecret.toLowerCase().contains("mock");
+    }
 
     public String getKeyId() {
         return keyId;

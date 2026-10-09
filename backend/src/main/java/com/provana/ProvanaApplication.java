@@ -20,9 +20,47 @@ public class ProvanaApplication {
     private static final Logger log = LoggerFactory.getLogger(ProvanaApplication.class);
 
     public static void main(String[] args) {
+        loadDotenv();
         SpringApplication app = new SpringApplication(ProvanaApplication.class);
         Environment env = app.run(args).getEnvironment();
         logApplicationStartup(env);
+    }
+
+    private static void loadDotenv() {
+        java.nio.file.Path[] potentialPaths = new java.nio.file.Path[]{
+                java.nio.file.Path.of(".env"),
+                java.nio.file.Path.of("backend/.env"),
+                java.nio.file.Path.of("../.env")
+        };
+
+        for (java.nio.file.Path path : potentialPaths) {
+            if (java.nio.file.Files.exists(path)) {
+                try {
+                    java.util.List<String> lines = java.nio.file.Files.readAllLines(path);
+                    for (String line : lines) {
+                        String trimmed = line.trim();
+                        if (trimmed.isEmpty() || trimmed.startsWith("#") || !trimmed.contains("=")) {
+                            continue;
+                        }
+                        int idx = trimmed.indexOf('=');
+                        String key = trimmed.substring(0, idx).trim();
+                        String value = trimmed.substring(idx + 1).trim();
+                        if (value.startsWith("\"") && value.endsWith("\"") && value.length() >= 2) {
+                            value = value.substring(1, value.length() - 1);
+                        } else if (value.startsWith("'") && value.endsWith("'") && value.length() >= 2) {
+                            value = value.substring(1, value.length() - 1);
+                        }
+                        if (System.getenv(key) == null && System.getProperty(key) == null) {
+                            System.setProperty(key, value);
+                        }
+                    }
+                    log.info("Successfully loaded environment variables from: {}", path.toAbsolutePath());
+                    break;
+                } catch (Exception e) {
+                    log.warn("Could not read .env file at {}: {}", path, e.getMessage());
+                }
+            }
+        }
     }
 
     private static void logApplicationStartup(Environment env) {

@@ -185,18 +185,45 @@ export default function GlobalModals() {
       };
 
       const razorpayInstance = new (window as any).Razorpay(options);
+
       razorpayInstance.on("payment.failed", function (failResponse: any) {
         setIsProcessingPayment(false);
-        const reason = failResponse.error?.description || "Payment failed at gateway";
-        setPaymentErrorMessage(`Payment failed: ${reason}`);
-        showToast(`❌ ${reason}`);
+        const err = failResponse?.error || {};
+        const code = err.code || "PAYMENT_FAILED";
+        const desc = err.description || "The transaction could not be completed by your bank or payment gateway.";
+        const source = err.source || "";
+        const step = err.step || "";
+        const reason = err.reason || "";
+        const paymentId = err.metadata?.payment_id || "";
+
+        console.error("Razorpay Payment Failure Diagnostic:", {
+          code,
+          description: desc,
+          source,
+          step,
+          reason,
+          paymentId,
+          orderId: err.metadata?.order_id || rzpOrder.razorpayOrderId,
+        });
+
+        let displayMsg = desc;
+        if (reason && reason !== "payment_failed") {
+          displayMsg += ` (${reason.replace(/_/g, " ")})`;
+        }
+        if (code && code !== "BAD_REQUEST_ERROR") {
+          displayMsg += ` [Ref: ${code}]`;
+        }
+
+        setPaymentErrorMessage(displayMsg);
+        showToast(`❌ Payment Failed: ${desc}`);
       });
 
       razorpayInstance.open();
     } catch (err: any) {
       setIsProcessingPayment(false);
-      setPaymentErrorMessage(err.message || "Failed to initiate payment gateway.");
-      showToast("⚠️ " + (err.message || "Checkout error"));
+      const errMsg = err.message || "Failed to initiate payment gateway.";
+      setPaymentErrorMessage(errMsg);
+      showToast("⚠️ " + errMsg);
     }
   };
 

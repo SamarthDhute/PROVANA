@@ -233,4 +233,71 @@ class PaymentServiceTest {
 
         assertThrows(BadRequestException.class, () -> paymentService.handleRazorpayWebhook(rawWebhookBody, "tampered_sig"));
     }
+
+    @Test
+    @DisplayName("Verify Razorpay Payment: Gateway Fetch Failure Does Not Capture Payment")
+    void verifyRazorpayPayment_GatewayFetchFails_ThrowsBadRequestAndDoesNotCapture() throws Exception {
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
+        when(paymentRepository.findByRazorpayOrderId("order_test_123456")).thenReturn(Optional.of(testPayment));
+        when(razorpayProperties.getKeySecret()).thenReturn("mock_secret");
+        when(signatureValidator.verifyPaymentSignature("order_test_123456", "pay_test_789", "valid_sig", "mock_secret"))
+                .thenReturn(true);
+        when(razorpayClientWrapper.fetchPayment("pay_test_789"))
+                .thenThrow(new RuntimeException("Gateway network timeout"));
+
+        var verifyReq = new VerifyRazorpayPaymentRequest(testOrder.getId(), "order_test_123456", "pay_test_789", "valid_sig");
+
+        assertThrows(BadRequestException.class, () -> paymentService.verifyRazorpayPayment(verifyReq, testUser));
+        assertNotEquals(PaymentStatus.CAPTURED, testPayment.getStatus());
+        assertNotEquals(OrderStatus.CONFIRMED, testOrder.getStatus());
+    }
+
+    @Test
+    @DisplayName("Verify Razorpay Payment: Gateway Status Failed Marks Payment Failed")
+    void verifyRazorpayPayment_GatewayStatusFailed_MarksFailedAndThrowsBadRequest() throws Exception {
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
+        when(paymentRepository.findByRazorpayOrderId("order_test_123456")).thenReturn(Optional.of(testPayment));
+        when(razorpayProperties.getKeySecret()).thenReturn("mock_secret");
+        when(signatureValidator.verifyPaymentSignature("order_test_123456", "pay_test_failed_bank", "valid_sig", "mock_secret"))
+                .thenReturn(true);
+        when(razorpayClientWrapper.fetchPayment("pay_test_failed_bank"))
+                .thenReturn(new RazorpayClientWrapper.GatewayPaymentResult("pay_test_failed_bank", "order_test_123456", 249900L, "failed", "netbanking", "Payment failed at bank"));
+
+        var verifyReq = new VerifyRazorpayPaymentRequest(testOrder.getId(), "order_test_123456", "pay_test_failed_bank", "valid_sig");
+
+        assertThrows(BadRequestException.class, () -> paymentService.verifyRazorpayPayment(verifyReq, testUser));
+        assertEquals(PaymentStatus.FAILED, testPayment.getStatus());
+        assertEquals("GATEWAY_PAYMENT_FAILED", testPayment.getFailureCode());
+        verify(paymentRepository).save(testPayment);
+    }
+
+    @Test
+    @DisplayName("Verify Razorpay Payment: Order ID Mismatch Marks Payment Failed")
+    void verifyRazorpayPayment_GatewayOrderIdMismatch_MarksFailed() throws Exception {
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
+        when(paymentRepository.findByRazorpayOrderId("order_test_123456")).thenReturn(Optional.of(testPayment));
+        when(razorpayProperties.getKeySecret()).thenReturn("mock_secret");
+        when(signatureValidator.verifyPaymentSignature("order_test_123456", "pay_test_789", "valid_sig", "mock_secret"))
+                .thenReturn(true);
+        when(razorpayClientWrapper.fetchPayment("pay_test_789"))
+                .thenReturn(new RazorpayClientWrapper.GatewayPaymentResult("pay_test_789", "order_mismatch_999", 249900L, "captured", "upi", null));
+
+        var verifyReq = new VerifyRazorpayPaymentRequest(testOrder.getId(), "order_test_123456", "pay_test_789", "valid_sig");
+
+        assertThrows(BadRequestException.class, () -> paymentService.verifyRazorpayPayment(verifyReq, testUser));
+        assertEquals(PaymentStatus.FAILED, testPayment.getStatus());
+        assertEquals("ORDER_ID_MISMATCH", testPayment.getFailureCode());
+    }
+
+    @Test
+    @DisplayName("Initiate Razorpay Order: Gateway Unconfigured Throws BadRequestException")
+    void initiateRazorpayOrder_GatewayUnconfigured_ThrowsBadRequest() throws Exception {
+        when(orderRepository.findById(testOrder.getId())).thenReturn(Optional.of(testOrder));
+        when(razorpayClientWrapper.createRazorpayOrder(anyLong(), anyString(), anyString(), any()))
+                .thenThrow(new BadRequestException("Razorpay payment gateway is not properly configured"));
+
+        var request = new InitiateRazorpayOrderRequest(testOrder.getId(), null, null);
+
+        assertThrows(BadRequestException.class, () -> paymentService.initiateRazorpayOrder(request, testUser));
+    }
 }

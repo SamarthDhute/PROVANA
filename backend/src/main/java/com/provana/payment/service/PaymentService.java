@@ -207,16 +207,57 @@ public class PaymentService {
             throw new BadRequestException("Invalid payment signature: Authentication rejected by PROVANA security");
         }
 
-        // Fetch and confirm status with gateway
-        String paymentMethod = "upi";
+        // Fetch and strictly confirm status with gateway
+        RazorpayClientWrapper.GatewayPaymentResult gatewayPayment;
         try {
-            var gatewayPayment = razorpayClientWrapper.fetchPayment(request.razorpayPaymentId());
-            if (gatewayPayment.method() != null) {
-                paymentMethod = gatewayPayment.method();
-            }
+            gatewayPayment = razorpayClientWrapper.fetchPayment(request.razorpayPaymentId());
         } catch (Exception e) {
-            log.warn("Could not fetch payment details from gateway, proceeding with signature confirmation: {}", e.getMessage());
+            log.error("Could not fetch payment details from Razorpay gateway for payment {}: {}",
+                    request.razorpayPaymentId(), e.getMessage());
+            // Do NOT mark as captured when gateway fetch fails! Keep in pending state.
+            throw new BadRequestException("Unable to confirm payment status with Razorpay gateway: " + e.getMessage() + ". Payment remains in pending state.");
         }
+
+        if (gatewayPayment == null) {
+            throw new BadRequestException("Gateway returned empty payment record for " + request.razorpayPaymentId());
+        }
+
+        // Validate order ID
+        if (gatewayPayment.orderId() != null && !gatewayPayment.orderId().equals(payment.getRazorpayOrderId())) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureCode("ORDER_ID_MISMATCH");
+            payment.setFailureDescription(String.format("Payment order ID %s does not match expected %s",
+                    gatewayPayment.orderId(), payment.getRazorpayOrderId()));
+            paymentRepository.save(payment);
+            throw new BadRequestException("Payment order ID mismatch detected: Security verification failed");
+        }
+
+        // Validate amount
+        if (gatewayPayment.amountMinorUnits() != null && !gatewayPayment.amountMinorUnits().equals(payment.getAmountMinorUnits())) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureCode("AMOUNT_MISMATCH");
+            payment.setFailureDescription(String.format("Payment amount %d does not match expected %d",
+                    gatewayPayment.amountMinorUnits(), payment.getAmountMinorUnits()));
+            paymentRepository.save(payment);
+            throw new BadRequestException("Payment amount mismatch detected: Security verification failed");
+        }
+
+        // Validate payment status from gateway
+        String status = gatewayPayment.status() != null ? gatewayPayment.status().toLowerCase() : "unknown";
+        if ("failed".equals(status)) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureCode("GATEWAY_PAYMENT_FAILED");
+            payment.setFailureDescription(gatewayPayment.errorDescription() != null ? gatewayPayment.errorDescription() : "Payment failed at bank / gateway");
+            paymentRepository.save(payment);
+            throw new BadRequestException("Payment failed at gateway: " + payment.getFailureDescription());
+        }
+
+        if (!"captured".equals(status) && !"authorized".equals(status)) {
+            log.warn("Payment {} has uncaptured status: {}", request.razorpayPaymentId(), status);
+            throw new BadRequestException("Payment is in unconfirmed state: " + status + ". Please retry or check with bank.");
+        }
+
+        String paymentMethod = gatewayPayment.method() != null ? gatewayPayment.method() : "gateway";
 
         // Confirm Payment & Order
         payment.setRazorpayPaymentId(request.razorpayPaymentId());

@@ -61,6 +61,9 @@ class RazorpayPaymentIntegrationTest {
     @Autowired
     private RazorpaySignatureValidator signatureValidator;
 
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private com.provana.payment.service.RazorpayClientWrapper razorpayClientWrapper;
+
     @Autowired
     private UserRepository userRepository;
 
@@ -102,6 +105,11 @@ class RazorpayPaymentIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        razorpayProperties.setKeyId("rzp_test_int_key");
+        razorpayProperties.setKeySecret("test_secret_key_1234567890");
+        razorpayProperties.setWebhookSecret("test_webhook_secret_1234567890");
+        razorpayProperties.setEnabled(true);
+
         testCustomer = userRepository.findByEmail("test_athlete@provana.com")
                 .orElseGet(() -> {
                     User u = new User();
@@ -183,6 +191,10 @@ class RazorpayPaymentIntegrationTest {
     @Test
     @DisplayName("Payment Initiation: Authenticated Customer initiates Razorpay Order")
     void initiateRazorpayOrder_Success() throws Exception {
+        String testRzpOrderId = "order_test_int_" + UUID.randomUUID().toString().substring(0, 10);
+        org.mockito.Mockito.when(razorpayClientWrapper.createRazorpayOrder(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new com.provana.payment.service.RazorpayClientWrapper.GatewayOrderResult(testRzpOrderId, 449820L, "INR", "created"));
+
         var itemReq = new CreateOrderItemRequest(testSku.getId(), null, null, null, null, 2);
         var orderReq = new CreateOrderRequest(
                 "Alex Hunter",
@@ -237,6 +249,10 @@ class RazorpayPaymentIntegrationTest {
     @Test
     @DisplayName("Signature Verification: Valid HMAC-SHA256 signature captures payment & updates stock")
     void verifyPayment_ValidSignature_CapturesPayment() throws Exception {
+        String testRzpOrderId = "order_test_" + UUID.randomUUID().toString().substring(0, 10);
+        org.mockito.Mockito.when(razorpayClientWrapper.createRazorpayOrder(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new com.provana.payment.service.RazorpayClientWrapper.GatewayOrderResult(testRzpOrderId, 249900L, "INR", "created"));
+
         // 1. Create order
         var itemReq = new CreateOrderItemRequest(testSku.getId(), null, null, null, null, 1);
         var orderReq = new CreateOrderRequest(
@@ -260,6 +276,9 @@ class RazorpayPaymentIntegrationTest {
         // 2. Compute valid signature using server key secret
         String payload = rzpOrderId + "|" + rzpPaymentId;
         String validSignature = signatureValidator.calculateHmacSha256(payload, razorpayProperties.getKeySecret());
+
+        org.mockito.Mockito.when(razorpayClientWrapper.fetchPayment(rzpPaymentId))
+                .thenReturn(new com.provana.payment.service.RazorpayClientWrapper.GatewayPaymentResult(rzpPaymentId, rzpOrderId, 249900L, "captured", "netbanking", null));
 
         // 3. Submit verification
         var verifyReq = new VerifyRazorpayPaymentRequest(localOrderId, rzpOrderId, rzpPaymentId, validSignature);
@@ -287,6 +306,10 @@ class RazorpayPaymentIntegrationTest {
     @Test
     @DisplayName("Signature Verification: Tampered signature is rejected with 400 Bad Request")
     void verifyPayment_InvalidSignature_Rejected() throws Exception {
+        String testRzpOrderId = "order_test_" + UUID.randomUUID().toString().substring(0, 10);
+        org.mockito.Mockito.when(razorpayClientWrapper.createRazorpayOrder(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new com.provana.payment.service.RazorpayClientWrapper.GatewayOrderResult(testRzpOrderId, 249900L, "INR", "created"));
+
         var itemReq = new CreateOrderItemRequest(testSku.getId(), null, null, null, null, 1);
         var orderReq = new CreateOrderRequest(
                 "Alex Hunter", "test_athlete@provana.com", "+91 98765 43210",
