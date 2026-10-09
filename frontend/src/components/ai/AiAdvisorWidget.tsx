@@ -233,7 +233,7 @@ export default function AiAdvisorWidget() {
                     </div>
                     <div style={{ display: "flex", gap: "6px" }}>
                       <button
-                        onClick={() => addToCart(m.recommendedProduct!.id)}
+                        onClick={() => addToCart(m.recommendedProduct!)}
                         style={{
                           flex: 1,
                           height: "30px",
@@ -248,7 +248,7 @@ export default function AiAdvisorWidget() {
                         ADD TO CART 🛒
                       </button>
                       <button
-                        onClick={() => buyNow(m.recommendedProduct!.id)}
+                        onClick={() => buyNow(m.recommendedProduct!)}
                         style={{
                           flex: 1,
                           height: "30px",

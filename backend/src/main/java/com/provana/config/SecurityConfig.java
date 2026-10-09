@@ -45,10 +45,16 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         // Public operational & documentation endpoints
                         .requestMatchers("/api/v1/health/**", "/actuator/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+                        // Public Razorpay Webhook endpoint (authenticated via HMAC-SHA256 signature against request body)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/webhooks/razorpay").permitAll()
                         // Public customer catalogue read endpoints
-                        .requestMatchers(HttpMethod.GET, "/api/v1/categories/**", "/api/v1/subcategories/**", "/api/v1/brands/**", "/api/v1/products/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categories/**", "/api/v1/subcategories/**", "/api/v1/brands/**", "/api/v1/products/**", "/api/v1/catalog/**").permitAll()
                         // User & RBAC Management: ADMIN only
                         .requestMatchers("/api/v1/admin/users/**").hasRole("ADMIN")
+
+                        // Order & Payment Management: ADMIN, MANAGER, ORDER_MANAGER
+                        .requestMatchers("/api/v1/admin/orders/**").hasAnyRole("ADMIN", "MANAGER", "ORDER_MANAGER")
+                        .requestMatchers("/api/v1/admin/payments/**").hasAnyRole("ADMIN", "MANAGER", "ORDER_MANAGER")
 
                         // Inventory Management: ADMIN, MANAGER
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/inventory/**").hasAnyRole("ADMIN", "MANAGER")
@@ -58,9 +64,9 @@ public class SecurityConfig {
                         // Media Upload: ADMIN, PRODUCT_MANAGER, CONTENT_MANAGER
                         .requestMatchers("/api/v1/admin/media/**").hasAnyRole("ADMIN", "PRODUCT_MANAGER", "CONTENT_MANAGER")
 
-                        // Catalogue Read (Categories, Subcategories, Brands, Products): ADMIN, PRODUCT_MANAGER, MANAGER, CONTENT_MANAGER, ORDER_MANAGER
+                        // Catalogue Read (Categories, Subcategories, Brands, Products): ADMIN, PRODUCT_MANAGER, MANAGER, CONTENT_MANAGER
                         .requestMatchers(HttpMethod.GET, "/api/v1/admin/categories/**", "/api/v1/admin/subcategories/**", "/api/v1/admin/brands/**", "/api/v1/admin/products/**")
-                        .hasAnyRole("ADMIN", "PRODUCT_MANAGER", "MANAGER", "CONTENT_MANAGER", "ORDER_MANAGER")
+                        .hasAnyRole("ADMIN", "PRODUCT_MANAGER", "MANAGER", "CONTENT_MANAGER")
 
                         // Catalogue Writes (Create, Update, Delete Products/Categories/Brands/Variants/SKUs): ADMIN, PRODUCT_MANAGER only
                         .requestMatchers("/api/v1/admin/categories/**").hasAnyRole("ADMIN", "PRODUCT_MANAGER")

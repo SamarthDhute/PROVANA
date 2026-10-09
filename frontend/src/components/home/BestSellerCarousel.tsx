@@ -5,12 +5,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { PROVANA_PRODUCTS } from "@/data/products";
 import { useStore } from "@/context/StoreContext";
+import { productApi, mapBackendProductSummaryToProduct } from "@/lib/api/productApi";
+import { Product } from "@/types";
 
 const TABS = ["ALL", "PROTEIN", "PERFORMANCE", "HEALTHY FOODS"];
 
 export default function BestSellerCarousel() {
-  const { addToCart, buyNow, toggleWishlist, isInWishlist } = useStore();
+  const { addToCart, buyNow, toggleWishlist, isInWishlist, registerProducts } = useStore();
   const [activeTab, setActiveTab] = useState("ALL");
+  const [liveProducts, setLiveProducts] = useState<Product[] | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -18,8 +21,25 @@ export default function BestSellerCarousel() {
   const [startX, setStartX] = useState(0);
   const [scrollLeftState, setScrollLeftState] = useState(0);
 
+  useEffect(() => {
+    productApi
+      .listProducts({ size: 100 })
+      .then((res) => {
+        if (res?.content) {
+          const mapped = res.content.map(mapBackendProductSummaryToProduct);
+          setLiveProducts(mapped);
+          registerProducts(mapped);
+        }
+      })
+      .catch((err) => {
+        console.warn("BestSellerCarousel: backend unavailable, using fallback:", err);
+      });
+  }, [registerProducts]);
+
+  const sourceProducts = liveProducts ?? PROVANA_PRODUCTS;
+
   // Filtered Best Sellers based on active tab
-  const filteredProducts = PROVANA_PRODUCTS.filter((p) => {
+  const filteredProducts = sourceProducts.filter((p) => {
     if (activeTab === "ALL") return true;
     if (activeTab === "PROTEIN") return p.category === "Protein";
     if (activeTab === "PERFORMANCE") return ["Performance", "Pre-Workout", "Creatine"].includes(p.category);
@@ -461,7 +481,7 @@ export default function BestSellerCarousel() {
                 {/* 4. ADD TO CART / BUY NOW */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                   <button
-                    onClick={() => addToCart(prod.id)}
+                    onClick={() => addToCart(prod)}
                     style={{
                       height: "44px",
                       backgroundColor: "#FFFFFF",
@@ -481,7 +501,7 @@ export default function BestSellerCarousel() {
                   </button>
 
                   <button
-                    onClick={() => buyNow(prod.id)}
+                    onClick={() => buyNow(prod)}
                     style={{
                       height: "44px",
                       backgroundColor: "#8FB8D8",

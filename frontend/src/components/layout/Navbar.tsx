@@ -8,6 +8,8 @@ import { useStore } from "@/context/StoreContext";
 import { useAuth } from "@/context/AuthContext";
 import { ROLE_PRESETS } from "@/types/auth";
 import { PROVANA_PRODUCTS } from "@/data/products";
+import { productApi, mapBackendProductSummaryToProduct } from "@/lib/api/productApi";
+import { Product } from "@/types";
 
 const NAV_CATEGORIES = [
   { label: "All Products 🛍️", href: "/products", category: "All", badge: "" },
@@ -29,7 +31,7 @@ export default function Navbar() {
   const [mounted, setMounted] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<typeof PROVANA_PRODUCTS>([]);
+  const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -69,15 +71,26 @@ export default function Navbar() {
       setIsSearchOpen(false);
       return;
     }
-    const matches = PROVANA_PRODUCTS.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q) ||
-        p.highlight.toLowerCase().includes(q) ||
-        p.flavors.some((f) => f.toLowerCase().includes(q))
-    ).slice(0, 5);
-    setSuggestions(matches);
-    setIsSearchOpen(matches.length > 0);
+    productApi
+      .listProducts({ search: q, size: 5 })
+      .then((res) => {
+        if (res?.content) {
+          const mapped = res.content.map(mapBackendProductSummaryToProduct);
+          setSuggestions(mapped);
+          setIsSearchOpen(mapped.length > 0);
+        }
+      })
+      .catch(() => {
+        const matches = PROVANA_PRODUCTS.filter(
+          (p) =>
+            p.name.toLowerCase().includes(q) ||
+            p.category.toLowerCase().includes(q) ||
+            p.highlight.toLowerCase().includes(q) ||
+            p.flavors.some((f) => f.toLowerCase().includes(q))
+        ).slice(0, 5);
+        setSuggestions(matches);
+        setIsSearchOpen(matches.length > 0);
+      });
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {

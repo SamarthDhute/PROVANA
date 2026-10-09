@@ -12,32 +12,56 @@ import { Product } from "@/types";
 export default function ProductDetailPage() {
   const params = useParams();
   const slug = params?.slug as string;
-  const fallbackProduct = PROVANA_PRODUCTS.find((p) => p.slug === slug || p.id === slug);
 
   const [liveProduct, setLiveProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isNotFound, setIsNotFound] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
+    setLoading(true);
+    setIsNotFound(false);
     productApi
       .getProductBySlug(slug)
       .then((detail) => {
         if (detail) {
           setLiveProduct(mapBackendProductDetailToProduct(detail));
+        } else {
+          setIsNotFound(true);
         }
       })
-      .catch((err) => {
-        console.warn("Backend product detail API error, using offline fallback:", err);
+      .catch((err: any) => {
+        console.warn("Backend product detail API error / not found:", err);
+        // If 404 from backend (e.g. deleted product), trigger not found immediately
+        if (err?.status === 404 || err?.statusCode === 404) {
+          setIsNotFound(true);
+        } else if (err?.status === 0) {
+          // Offline / network failure fallback
+          const fallbackProduct = PROVANA_PRODUCTS.find((p) => p.slug === slug || p.id === slug);
+          if (fallbackProduct) {
+            setLiveProduct(fallbackProduct);
+          } else {
+            setIsNotFound(true);
+          }
+        } else {
+          setIsNotFound(true);
+        }
       })
       .finally(() => {
         setLoading(false);
       });
   }, [slug]);
 
-  const product = liveProduct || fallbackProduct;
+  const product = liveProduct;
 
-  const { addToCart, buyNow, toggleWishlist, isInWishlist, openModal } = useStore();
+  const { addToCart, buyNow, toggleWishlist, isInWishlist, openModal, registerProducts } = useStore();
   const wishlisted = product ? isInWishlist(product.id) : false;
+
+  useEffect(() => {
+    if (product) {
+      registerProducts([product]);
+    }
+  }, [product, registerProducts]);
 
   const [selectedFlavor, setSelectedFlavor] = useState(product?.flavors?.[0] || "Standard");
   const [selectedSize, setSelectedSize] = useState(product?.sizes?.[0] || "Standard");
@@ -55,7 +79,7 @@ export default function ProductDetailPage() {
     }
   }, [product]);
 
-  if (!loading && !product) {
+  if (!loading && (isNotFound || !product)) {
     notFound();
   }
 
@@ -306,7 +330,7 @@ export default function ProductDetailPage() {
 
               {/* Add to Cart */}
               <button
-                onClick={() => addToCart(product.id, selectedFlavor, selectedSize, qty)}
+                onClick={() => addToCart(product, selectedFlavor, selectedSize, qty)}
                 style={{
                   flex: 1,
                   height: "48px",
@@ -325,7 +349,7 @@ export default function ProductDetailPage() {
 
               {/* ⚡ BUY NOW (Athletic Grey) */}
               <button
-                onClick={() => buyNow(product.id, selectedFlavor, selectedSize, qty)}
+                onClick={() => buyNow(product, selectedFlavor, selectedSize, qty)}
                 style={{
                   flex: 1.1,
                   height: "48px",

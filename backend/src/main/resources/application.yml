@@ -87,6 +87,12 @@ provana:
     url: ${SUPABASE_URL:https://ocsvfxbamfbwrxpydrda.supabase.co}
     api-key: ${SUPABASE_API_KEY:}
     bucket: ${SUPABASE_BUCKET:provana-media}
+  razorpay:
+    key-id: ${RAZORPAY_KEY_ID:rzp_test_mockkeyid12345}
+    key-secret: ${RAZORPAY_KEY_SECRET:mocksecretkey1234567890abcdef}
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:mockwebhooksecret123456789}
+    currency: ${RAZORPAY_CURRENCY:INR}
+    enabled: ${RAZORPAY_ENABLED:true}
 
 # Logging
 logging:

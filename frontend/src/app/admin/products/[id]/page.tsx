@@ -99,7 +99,16 @@ export default function AdminProductDetailPage() {
     sortOrder: 1,
   });
 
-  const isStaff = isAuthenticated && (user?.role === "ADMIN" || user?.role === "PRODUCT_MANAGER" || user?.role === "MANAGER");
+  const isStaff = isAuthenticated && user?.role !== "CUSTOMER" && (user?.role === "ADMIN" || user?.role === "PRODUCT_MANAGER" || user?.role === "MANAGER");
+
+  useEffect(() => {
+    if (!isStaff) {
+      setProduct(null);
+      setCategories([]);
+      setSubcategories([]);
+      setBrands([]);
+    }
+  }, [isStaff]);
 
   const loadProductData = useCallback(async () => {
     if (!id || !token || !isStaff) return;

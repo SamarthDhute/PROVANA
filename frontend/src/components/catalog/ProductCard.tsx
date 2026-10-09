@@ -173,7 +173,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         {/* Dual Actions: Add to Cart + Athletic Grey Buy Now */}
         <div style={{ display: "flex", gap: "8px" }}>
           <button
-            onClick={() => addToCart(product.id)}
+            onClick={() => addToCart(product)}
             style={{
               flex: 1,
               height: "40px",
@@ -191,7 +191,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             ADD TO CART 🛒
           </button>
           <button
-            onClick={() => buyNow(product.id)}
+            onClick={() => buyNow(product)}
             style={{
               flex: 1.1,
               height: "40px",

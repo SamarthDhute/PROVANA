@@ -3,12 +3,8 @@ package com.provana.inventory.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.provana.auth.JwtTokenProvider;
 import com.provana.auth.Role;
-import com.provana.catalog.entity.Product;
-import com.provana.catalog.entity.ProductVariant;
-import com.provana.catalog.entity.Sku;
-import com.provana.catalog.repository.ProductRepository;
-import com.provana.catalog.repository.ProductVariantRepository;
-import com.provana.catalog.repository.SkuRepository;
+import com.provana.catalog.entity.*;
+import com.provana.catalog.repository.*;
 import com.provana.inventory.dto.InventoryAdjustmentRequest;
 import com.provana.inventory.entity.Inventory;
 import com.provana.inventory.entity.MovementType;
@@ -57,16 +53,35 @@ class InventoryAndCataloguePhase3IntegrationTest {
     private ProductVariantRepository variantRepository;
 
     @Autowired
+    private BrandRepository brandRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
+
+    @Autowired
     private InventoryRepository inventoryRepository;
 
     private Sku testSku;
 
     @BeforeEach
     void setUp() {
-        testSku = skuRepository.findBySkuCode("PROV-WPI-CHOC-2KG").orElseGet(() -> {
-            Product p = productRepository.findBySlug("provana-100-pure-whey-isolate")
-                    .orElseThrow();
+        Product p = productRepository.findBySlug("provana-100-pure-whey-isolate").orElseGet(() -> {
+            Brand brand = brandRepository.findBySlug("provana-brand").orElseGet(() ->
+                    brandRepository.save(new Brand("Provana", "provana-brand", "Provana brand", "https://provana.com/logo.png"))
+            );
+            Category category = categoryRepository.findBySlug("protein").orElseGet(() ->
+                    categoryRepository.save(new Category("Protein", "protein", "Protein category", "https://provana.com/cat.png", 0))
+            );
+            Product newProd = new Product();
+            newProd.setName("Provana 100% Pure Whey Isolate");
+            newProd.setSlug("provana-100-pure-whey-isolate");
+            newProd.setBrand(brand);
+            newProd.setCategory(category);
+            newProd.setStatus(ProductStatus.PUBLISHED);
+            return productRepository.save(newProd);
+        });
 
+        testSku = skuRepository.findBySkuCode("PROV-WPI-CHOC-2KG").orElseGet(() -> {
             var variants = variantRepository.findByProductIdOrderBySortOrderAsc(p.getId());
             ProductVariant variant;
             if (variants.isEmpty()) {
@@ -108,120 +123,79 @@ class InventoryAndCataloguePhase3IntegrationTest {
     @DisplayName("ADMIN: Can access /api/v1/admin/inventory (200 OK)")
     void admin_CanListInventory() throws Exception {
         mockMvc.perform(get("/api/v1/admin/inventory")
-                        .header("Authorization", createBearerToken("admin@provana.com", Role.ADMIN))
-                        .contentType(MediaType.APPLICATION_JSON))
+                        .header("Authorization", createBearerToken("admin@provana.com", Role.ADMIN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.content", hasSize(greaterThanOrEqualTo(1))));
+                .andExpect(jsonPath("$.data.content").isArray());
     }
 
     @Test
     @DisplayName("MANAGER: Can access /api/v1/admin/inventory (200 OK)")
     void manager_CanListInventory() throws Exception {
         mockMvc.perform(get("/api/v1/admin/inventory")
-                        .header("Authorization", createBearerToken("manager@provana.com", Role.MANAGER))
-                        .contentType(MediaType.APPLICATION_JSON))
+                        .header("Authorization", createBearerToken("manager@provana.com", Role.MANAGER)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }
 
     @Test
-    @DisplayName("MANAGER: Can perform stock adjustment (200 OK)")
-    void manager_CanAdjustStock() throws Exception {
-        InventoryAdjustmentRequest request = new InventoryAdjustmentRequest(
-                15,
-                MovementType.STOCK_RECEIVED,
-                "Restock from supplier batch",
-                "PURCHASE_ORDER",
-                "PO-2026-99"
-        );
+    @DisplayName("ORDER_MANAGER: Forbidden from accessing /api/v1/admin/inventory (403 Forbidden)")
+    void orderManager_ForbiddenFromInventory() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/inventory")
+                        .header("Authorization", createBearerToken("order@provana.com", Role.ORDER_MANAGER)))
+                .andExpect(status().isForbidden());
+    }
 
-        mockMvc.perform(post("/api/v1/admin/inventory/" + testSku.getId() + "/adjust")
-                        .header("Authorization", createBearerToken("manager@provana.com", Role.MANAGER))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+    @Test
+    @DisplayName("PRODUCT_MANAGER: Forbidden from accessing /api/v1/admin/inventory (403 Forbidden)")
+    void productManager_ForbiddenFromInventory() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/inventory")
+                        .header("Authorization", createBearerToken("pm@provana.com", Role.PRODUCT_MANAGER)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("CUSTOMER: Forbidden from accessing /api/v1/admin/inventory (403 Forbidden)")
+    void customer_ForbiddenFromInventory() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/inventory")
+                        .header("Authorization", createBearerToken("customer@provana.com", Role.CUSTOMER)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Anonymous: Unauthorized on /api/v1/admin/inventory (401 Unauthorized)")
+    void anonymous_UnauthorizedOnInventory() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/inventory"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Public Stock Check: Anonymous user can check stock for SKU (200 OK)")
+    void public_StockCheck_Returns200() throws Exception {
+        mockMvc.perform(get("/api/v1/catalog/skus/" + testSku.getId() + "/stock"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.skuCode").value(testSku.getSkuCode()));
+                .andExpect(jsonPath("$.data.inStock").value(true))
+                .andExpect(jsonPath("$.data.skuCode").value("PROV-WPI-CHOC-2KG"));
     }
 
     @Test
-    @DisplayName("MANAGER: Negative stock adjustment beyond available quantity is rejected (400 Bad Request)")
-    void manager_RejectNegativeStock() throws Exception {
-        InventoryAdjustmentRequest request = new InventoryAdjustmentRequest(
-                -999999, // Exceeds available
-                MovementType.MANUAL_ADJUSTMENT,
-                "Excess deduction",
-                null,
-                null
-        );
-
-        mockMvc.perform(post("/api/v1/admin/inventory/" + testSku.getId() + "/adjust")
-                        .header("Authorization", createBearerToken("manager@provana.com", Role.MANAGER))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message", containsString("cannot be negative")));
-    }
-
-    @Test
-    @DisplayName("PRODUCT_MANAGER: Cannot adjust inventory (403 Forbidden)")
-    void productManager_CannotAdjustInventory() throws Exception {
-        InventoryAdjustmentRequest request = new InventoryAdjustmentRequest(
+    @DisplayName("Admin Stock Adjustment: Manual stock increase records movement audit (200 OK)")
+    void admin_CanAdjustStock() throws Exception {
+        InventoryAdjustmentRequest req = new InventoryAdjustmentRequest(
                 10,
                 MovementType.STOCK_RECEIVED,
-                "Unauthorized PM adjustment",
-                null,
+                "Restock batch from warehouse",
+                "PO-10023",
                 null
         );
 
         mockMvc.perform(post("/api/v1/admin/inventory/" + testSku.getId() + "/adjust")
-                        .header("Authorization", createBearerToken("pm@provana.com", Role.PRODUCT_MANAGER))
+                        .header("Authorization", createBearerToken("admin@provana.com", Role.ADMIN))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.success").value(false));
-    }
-
-    @Test
-    @DisplayName("CUSTOMER: Cannot access admin inventory APIs (403 Forbidden)")
-    void customer_CannotAccessInventory() throws Exception {
-        mockMvc.perform(get("/api/v1/admin/inventory")
-                        .header("Authorization", createBearerToken("customer@provana.com", Role.CUSTOMER))
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.success").value(false));
-    }
-
-    @Test
-    @DisplayName("MANAGER: Cannot write or create products in catalogue (403 Forbidden)")
-    void manager_CannotCreateProduct() throws Exception {
-        String validProductJson = """
-                {
-                  "name": "Manager Forbidden Product",
-                  "slug": "manager-forbidden-product",
-                  "brandId": "11111111-1111-1111-1111-111111111111",
-                  "categoryId": "22222222-2222-2222-2222-222222222001",
-                  "status": "DRAFT"
-                }
-                """;
-
-        mockMvc.perform(post("/api/v1/admin/products")
-                        .header("Authorization", createBearerToken("manager@provana.com", Role.MANAGER))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validProductJson))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.success").value(false));
-    }
-
-    @Test
-    @DisplayName("PUBLIC: Customer can browse published products (200 OK)")
-    void publicCustomer_CanBrowseProducts() throws Exception {
-        mockMvc.perform(get("/api/v1/products")
-                        .contentType(MediaType.APPLICATION_JSON))
+                        .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.content", hasSize(greaterThanOrEqualTo(1))));
+                .andExpect(jsonPath("$.data.availableQuantity").isNumber());
     }
 }

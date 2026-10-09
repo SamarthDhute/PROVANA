@@ -100,13 +100,23 @@ export default function AdminCataloguePage() {
     status: "PUBLISHED" as "DRAFT" | "PUBLISHED" | "UNPUBLISHED",
   });
 
-  const isStaff = isAuthenticated && (
-    can("CATALOGUE_READ") ||
-    can("USER_READ") ||
-    can("INVENTORY_READ") ||
-    can("ORDER_READ") ||
-    can("CMS_READ")
+  const isStaff = isAuthenticated && user?.role !== "CUSTOMER" && (
+    user?.role === "ADMIN" ||
+    user?.role === "PRODUCT_MANAGER" ||
+    user?.role === "MANAGER" ||
+    user?.role === "CONTENT_MANAGER" ||
+    user?.role === "ORDER_MANAGER"
   );
+
+  useEffect(() => {
+    if (!isStaff) {
+      setProducts([]);
+      setCategories([]);
+      setSubcategories([]);
+      setBrands([]);
+      setInventoryItems([]);
+    }
+  }, [isStaff]);
 
   // Fetch Products & Metadata
   const fetchData = useCallback(async () => {

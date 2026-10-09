@@ -2,6 +2,9 @@
 
 import React, { useState } from "react";
 import { useStore } from "@/context/StoreContext";
+import { useAuth } from "@/context/AuthContext";
+import { paymentApi } from "@/lib/api/paymentApi";
+import { loadRazorpayScript } from "@/lib/razorpay/loadRazorpay";
 
 interface BatchReport {
   title: string;
@@ -14,7 +17,8 @@ interface BatchReport {
 }
 
 export default function GlobalModals() {
-  const { activeModal, closeModal, showToast, clearCart, cartSubtotal, addToCart } = useStore();
+  const { activeModal, closeModal, showToast, clearCart, cart, cartSubtotal, addToCart, appliedCoupon } = useStore();
+  const { user } = useAuth();
 
   // Batch Verify State
   const [batchCode, setBatchCode] = useState("PV-B9402");
@@ -23,6 +27,8 @@ export default function GlobalModals() {
   // Checkout State
   const [checkoutStep, setCheckoutStep] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState("upi");
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentErrorMessage, setPaymentErrorMessage] = useState<string | null>(null);
   const [addressForm, setAddressForm] = useState({
     name: "Alex Hunter",
     phone: "+91 98765 43210",
@@ -79,13 +85,119 @@ export default function GlobalModals() {
     }
   };
 
-  const completeOrder = (e: React.FormEvent) => {
+  const completeOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newId = "PV-" + Math.floor(100000 + Math.random() * 900000);
-    setOrderConfirmedId(newId);
-    clearCart();
-    setCheckoutStep(4);
-    showToast(`🎉 Order ${newId} placed successfully!`);
+    if (cart.length === 0) {
+      showToast("Your cart is empty. Add items before checking out.");
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    setPaymentErrorMessage(null);
+
+    try {
+      // 1. Ensure Razorpay SDK script is loaded
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) {
+        throw new Error("Unable to load Razorpay Checkout SDK. Please check your internet connection.");
+      }
+
+      // 2. Prepare Order Payload
+      const orderPayload = {
+        customerName: addressForm.name.trim() || "Customer",
+        customerEmail: user?.email || "customer@provana.com",
+        customerPhone: addressForm.phone.trim() || "+91 98765 43210",
+        shippingAddress: addressForm.address.trim() || "Delivery Address",
+        shippingCity: addressForm.city.trim() || "Bengaluru",
+        shippingState: addressForm.state.trim() || "Karnataka",
+        shippingPincode: addressForm.pincode.trim() || "560102",
+        appliedCoupon: appliedCoupon || undefined,
+        items: cart.map((item) => ({
+          productId: item.id.length === 36 && item.id.includes("-") ? item.id : undefined,
+          productSlug: item.id,
+          flavor: item.flavor,
+          size: item.size,
+          quantity: item.qty,
+        })),
+      };
+
+      // 3. Initiate Razorpay Order from Backend
+      const rzpOrder = await paymentApi.initiateRazorpayOrder({
+        orderData: orderPayload as any,
+        idempotencyKey: `checkout_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      });
+
+      // 4. Configure Razorpay Standard Checkout options
+      const options = {
+        key: rzpOrder.keyId,
+        amount: rzpOrder.amountMinorUnits,
+        currency: rzpOrder.currency,
+        name: "PROVANA Pure Nutrition",
+        description: rzpOrder.description || `Order ${rzpOrder.orderNumber}`,
+        image: "/assets/brand-logo.png",
+        order_id: rzpOrder.razorpayOrderId,
+        prefill: {
+          name: addressForm.name,
+          email: user?.email || "customer@provana.com",
+          contact: addressForm.phone,
+        },
+        notes: {
+          orderNumber: rzpOrder.orderNumber,
+          localOrderId: rzpOrder.localOrderId,
+        },
+        theme: {
+          color: "#F59E0B",
+        },
+        handler: async function (response: any) {
+          try {
+            setIsProcessingPayment(true);
+            showToast("Verifying payment with PROVANA security server...");
+
+            // 5. Submit server-side signature verification
+            const verifyRes = await paymentApi.verifyRazorpayPayment({
+              orderId: rzpOrder.localOrderId,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+
+            if (verifyRes.verified) {
+              clearCart();
+              setOrderConfirmedId(rzpOrder.orderNumber);
+              setCheckoutStep(4);
+              showToast(`🎉 Order ${rzpOrder.orderNumber} confirmed! Payment captured.`);
+            } else {
+              setPaymentErrorMessage(verifyRes.message || "Payment verification failed. Please contact support.");
+            }
+          } catch (verifyErr: any) {
+            setPaymentErrorMessage(verifyErr.message || "Payment verification failed on server.");
+            showToast("⚠️ Payment verification failed: " + (verifyErr.message || "Signature mismatch"));
+          } finally {
+            setIsProcessingPayment(false);
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            setIsProcessingPayment(false);
+            showToast("Payment window closed. You can retry checkout anytime.");
+          },
+        },
+      };
+
+      const razorpayInstance = new (window as any).Razorpay(options);
+      razorpayInstance.on("payment.failed", function (failResponse: any) {
+        setIsProcessingPayment(false);
+        const reason = failResponse.error?.description || "Payment failed at gateway";
+        setPaymentErrorMessage(`Payment failed: ${reason}`);
+        showToast(`❌ ${reason}`);
+      });
+
+      razorpayInstance.open();
+    } catch (err: any) {
+      setIsProcessingPayment(false);
+      setPaymentErrorMessage(err.message || "Failed to initiate payment gateway.");
+      showToast("⚠️ " + (err.message || "Checkout error"));
+    }
   };
 
   const handleAddStackToCart = () => {
@@ -430,18 +542,49 @@ export default function GlobalModals() {
                   </div>
                 </div>
 
+                {paymentErrorMessage && (
+                  <div
+                    style={{
+                      backgroundColor: "rgba(239, 68, 68, 0.15)",
+                      border: "1px solid #EF4444",
+                      borderRadius: "6px",
+                      padding: "10px 14px",
+                      fontSize: "12.5px",
+                      color: "#FCA5A5",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    ⚠️ {paymentErrorMessage}
+                  </div>
+                )}
+
                 <div style={{ display: "flex", gap: "10px" }}>
                   <button
+                    disabled={isProcessingPayment}
                     onClick={() => setCheckoutStep(2)}
-                    style={{ flex: 1, height: "44px", borderRadius: "6px", backgroundColor: "#252B37", color: "#FFF", fontWeight: "700" }}
+                    style={{ flex: 1, height: "44px", borderRadius: "6px", backgroundColor: "#252B37", color: "#FFF", fontWeight: "700", cursor: isProcessingPayment ? "not-allowed" : "pointer" }}
                   >
                     ← BACK
                   </button>
                   <button
+                    disabled={isProcessingPayment}
                     onClick={completeOrder}
-                    style={{ flex: 2, height: "44px", borderRadius: "6px", backgroundColor: "#10B981", color: "#0B0C0E", fontWeight: "800", fontSize: "14px" }}
+                    style={{
+                      flex: 2,
+                      height: "44px",
+                      borderRadius: "6px",
+                      backgroundColor: isProcessingPayment ? "#059669" : "#10B981",
+                      color: "#0B0C0E",
+                      fontWeight: "800",
+                      fontSize: "14px",
+                      cursor: isProcessingPayment ? "wait" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                    }}
                   >
-                    PAY &amp; PLACE ORDER 🔒
+                    {isProcessingPayment ? "PROCESSING PAYMENT..." : "PAY & PLACE ORDER 🔒"}
                   </button>
                 </div>
               </div>

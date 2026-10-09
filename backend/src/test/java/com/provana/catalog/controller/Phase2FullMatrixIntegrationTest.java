@@ -522,7 +522,7 @@ class Phase2FullMatrixIntegrationTest {
 
     @Test
     @Order(17)
-    @DisplayName("17. Delete/deactivate product")
+    @DisplayName("17. Delete/deactivate product and verify exclusion from public endpoints")
     void test17_deleteProduct() throws Exception {
         CreateProductRequest req = new CreateProductRequest(
                 "Temp Product To Delete",
@@ -531,7 +531,7 @@ class Phase2FullMatrixIntegrationTest {
                 testCategoryId,
                 testSubcategoryId,
                 null, null, null, null, null, null, null, null, null,
-                ProductStatus.DRAFT, null, null
+                ProductStatus.PUBLISHED, null, null
         );
 
         MvcResult res = mockMvc.perform(post("/api/v1/admin/products")
@@ -543,10 +543,25 @@ class Phase2FullMatrixIntegrationTest {
 
         UUID tempProdId = UUID.fromString(objectMapper.readTree(res.getResponse().getContentAsString()).get("data").get("id").asText());
 
+        // Verify it was queryable in public customer listing
+        mockMvc.perform(get("/api/v1/products/temp-product-to-delete"))
+                .andExpect(status().isOk());
+
+        // Perform delete operation
         mockMvc.perform(delete("/api/v1/admin/products/" + tempProdId)
                         .header("Authorization", adminToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
+
+        // Verify product no longer exists in customer public PDP (404 Not Found)
+        mockMvc.perform(get("/api/v1/products/temp-product-to-delete"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+
+        // Verify search exclusion
+        mockMvc.perform(get("/api/v1/products").param("search", "Temp Product To Delete"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content", hasSize(0)));
     }
 
     @Test

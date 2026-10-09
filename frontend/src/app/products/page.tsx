@@ -7,6 +7,7 @@ import { PROVANA_PRODUCTS } from "@/data/products";
 import ProductCard from "@/components/catalog/ProductCard";
 import { productApi, mapBackendProductSummaryToProduct } from "@/lib/api/productApi";
 import { Product } from "@/types";
+import { useStore } from "@/context/StoreContext";
 
 const CATEGORIES = [
   "All",
@@ -28,6 +29,7 @@ const GOALS = [
 ];
 
 function CatalogContent() {
+  const { registerProducts } = useStore();
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get("category") || "All";
   const initialGoal = searchParams.get("goal") || "All";
@@ -44,14 +46,16 @@ function CatalogContent() {
     productApi
       .listProducts({ size: 100 })
       .then((res) => {
-        if (res?.content && res.content.length > 0) {
-          setLiveProducts(res.content.map(mapBackendProductSummaryToProduct));
+        if (res?.content) {
+          const mapped = res.content.map(mapBackendProductSummaryToProduct);
+          setLiveProducts(mapped);
+          registerProducts(mapped);
         }
       })
       .catch((err) => {
         console.warn("Backend product API unavailable, using offline fallback:", err);
       });
-  }, []);
+  }, [registerProducts]);
 
   // Sync state whenever URL searchParams change (e.g. from Header navigation)
   useEffect(() => {
@@ -68,7 +72,7 @@ function CatalogContent() {
     });
   }, [searchParams]);
 
-  const sourceProducts = liveProducts || PROVANA_PRODUCTS;
+  const sourceProducts = liveProducts ?? PROVANA_PRODUCTS;
 
   // Multi-Filter & Sort Pipeline
   const filteredProducts = useMemo(() => {

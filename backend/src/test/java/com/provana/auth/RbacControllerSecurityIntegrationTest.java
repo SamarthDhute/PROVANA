@@ -456,4 +456,52 @@ class RbacControllerSecurityIntegrationTest {
                 .andExpect(jsonPath("$.data.email").value("customer@provana.com"))
                 .andExpect(jsonPath("$.data.role").value("CUSTOMER"));
     }
+
+    // =========================================================================
+    // 8. BUG A & BUG B REGRESSION TESTS
+    // =========================================================================
+
+    @Test
+    @DisplayName("Bug A Regression: CUSTOMER cannot access admin products endpoint (403 Forbidden)")
+    void customer_CannotAccessAdminProducts() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/products")
+                        .header("Authorization", createBearerToken(Role.CUSTOMER, "customer@provana.com"))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message", containsString("Access denied")));
+    }
+
+    @Test
+    @DisplayName("Bug A Regression: CUSTOMER cannot delete products via admin API (403 Forbidden)")
+    void customer_CannotDeleteProduct() throws Exception {
+        mockMvc.perform(delete("/api/v1/admin/products/" + UUID.randomUUID())
+                        .header("Authorization", createBearerToken(Role.CUSTOMER, "customer@provana.com"))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message", containsString("Access denied")));
+    }
+
+    @Test
+    @DisplayName("Bug A Regression: Role switch to CUSTOMER rejects all administrative paths")
+    void customer_SwitchedRole_RejectsAllAdminEndpoints() throws Exception {
+        String customerToken = createBearerToken(Role.CUSTOMER, "switched_user@provana.com");
+
+        // 1. Admin products list
+        mockMvc.perform(get("/api/v1/admin/products").header("Authorization", customerToken))
+                .andExpect(status().isForbidden());
+
+        // 2. Admin categories list
+        mockMvc.perform(get("/api/v1/admin/categories").header("Authorization", customerToken))
+                .andExpect(status().isForbidden());
+
+        // 3. Admin inventory list
+        mockMvc.perform(get("/api/v1/admin/inventory").header("Authorization", customerToken))
+                .andExpect(status().isForbidden());
+
+        // 4. Admin users list
+        mockMvc.perform(get("/api/v1/admin/users").header("Authorization", customerToken))
+                .andExpect(status().isForbidden());
+    }
 }
